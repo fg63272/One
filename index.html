@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AASHTO Sight Distance Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:   #1a4b8c;
+      --blue2:  #2563eb;
+      --orange: #ea580c;
+      --bg:     #f1f5f9;
+      --card:   #ffffff;
+      --text:   #1e293b;
+      --muted:  #64748b;
+      --border: #e2e8f0;
+      --green:  #15803d;
+      --red:    #dc2626;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #0f2d5e 0%, var(--blue) 100%);
+      color: #fff;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header h1 { font-size: 1.375rem; font-weight: 700; letter-spacing: -.01em; }
+    header p  { font-size: .8125rem; opacity: .75; margin-top: .2rem; }
+
+    .units-row {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+    .units-row span {
+      font-size: .8125rem;
+      font-weight: 600;
+      opacity: .8;
+    }
+    .toggle {
+      display: flex;
+      border: 1.5px solid rgba(255,255,255,.3);
+      border-radius: .4rem;
+      overflow: hidden;
+    }
+    .toggle button {
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,.7);
+      padding: .35rem .9rem;
+      font-size: .8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .toggle button.on {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+    }
+
+    /* ── Container + Tabs ────────────────────────────── */
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: .7rem 1.2rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 2.5px solid transparent;
+      margin-bottom: -2px;
+      white-space: nowrap;
+      transition: color .15s;
+    }
+    .tab:hover  { color: var(--blue); }
+    .tab.on     { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .panel { display: none; }
+    .panel.on { display: block; }
+
+    /* ── Cards ───────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .card-title {
+      font-size: .9375rem;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Info box ─────────────────────────────────────── */
+    .info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 3px solid var(--blue2);
+      border-radius: .5rem;
+      padding: .875rem 1rem;
+      font-size: .875rem;
+      color: #1d4ed8;
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+    .info strong { display: block; margin-bottom: .2rem; }
+
+    /* ── Form grid ───────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 1rem;
+    }
+
+    .fg { display: flex; flex-direction: column; gap: .35rem; }
+    .fg label {
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .iw {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid var(--border);
+      border-radius: .45rem;
+      background: #fff;
+      overflow: hidden;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .iw:focus-within {
+      border-color: var(--blue2);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .iw input, .iw select {
+      flex: 1;
+      border: none;
+      outline: none;
+      padding: .575rem .75rem;
+      font-size: .9375rem;
+      color: var(--text);
+      background: transparent;
+      min-width: 0;
+    }
+    .iw select { cursor: pointer; }
+    .ul {
+      padding: 0 .7rem;
+      font-size: .75rem;
+      color: var(--muted);
+      border-left: 1px solid var(--border);
+      background: #f8fafc;
+      white-space: nowrap;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+    }
+
+    .hint {
+      font-size: .78125rem;
+      color: var(--muted);
+      margin-top: .6rem;
+      line-height: 1.5;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin: 1.2rem 0;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .btn {
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: .45rem;
+      padding: .65rem 1.75rem;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: background .15s, transform .1s, box-shadow .15s;
+    }
+    .btn:hover {
+      background: var(--blue2);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(37,99,235,.3);
+    }
+    .btn.ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1.5px solid var(--border);
+      margin-left: .5rem;
+    }
+    .btn.ghost:hover { background: var(--bg); transform: none; box-shadow: none; }
+
+    /* ── Results grid ─────────────────────────────────── */
+    .rg {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+      gap: .875rem;
+    }
+    .ri {
+      background: var(--bg);
+      border-radius: .5rem;
+      padding: .875rem;
+      text-align: center;
+    }
+    .ri.hero {
+      background: var(--blue);
+      color: #fff;
+    }
+    .ri-label {
+      font-size: .6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin-bottom: .4rem;
+    }
+    .ri.hero .ri-label { color: rgba(255,255,255,.65); }
+    .ri-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--blue);
+      line-height: 1;
+    }
+    .ri.hero .ri-value { color: #fff; }
+    .ri-unit {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-left: .15rem;
+    }
+    .ri.hero .ri-unit { color: rgba(255,255,255,.65); }
+
+    /* ── Comparison banner ────────────────────────────── */
+    .cmp {
+      display: none;
+      align-items: center;
+      gap: .75rem;
+      padding: .7rem 1rem;
+      border-radius: .45rem;
+      font-size: .875rem;
+      font-weight: 700;
+      margin-top: 1rem;
+    }
+    .cmp.pass { background: #f0fdf4; border: 1px solid #86efac; color: var(--green); }
+    .cmp.fail { background: #fef2f2; border: 1px solid #fca5a5; color: var(--red);   }
+    .cmp-icon { font-size: 1.1rem; }
+
+    /* ── Formula box ──────────────────────────────────── */
+    .fbox {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      border-radius: .35rem;
+      padding: .75rem 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: .8125rem;
+      color: #334155;
+      margin-top: 1rem;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    /* ── Reference tables ─────────────────────────────── */
+    .tw { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+    th {
+      background: var(--blue);
+      color: #fff;
+      padding: .55rem .75rem;
+      font-size: .75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    td {
+      padding: .45rem .75rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+    tr:hover td { background: #eff6ff; }
+    td strong { color: var(--blue); }
+
+    @media (max-width: 550px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+      header { padding: 1rem; }
+      header h1 { font-size: 1.125rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AASHTO Sight Distance Calculator</h1>
+    <p>Highway Geometric Design — AASHTO Green Book Reference</p>
+  </div>
+  <div class="units-row">
+    <span>Units:</span>
+    <div class="toggle">
+      <button id="btn-us" class="on" onclick="setUnits('us')">US Customary</button>
+      <button id="btn-si"          onclick="setUnits('si')">Metric (SI)</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tabs">
+    <button class="tab on"  onclick="showTab('ssd',this)">Stopping (SSD)</button>
+    <button class="tab"     onclick="showTab('psd',this)">Passing (PSD)</button>
+    <button class="tab"     onclick="showTab('dsd',this)">Decision (DSD)</button>
+    <button class="tab"     onclick="showTab('ref',this)">Reference Tables</button>
+  </div>
+
+  <!-- ═══════════════ SSD ═══════════════ -->
+  <div id="panel-ssd" class="panel on">
+
+    <div class="info">
+      <strong>Stopping Sight Distance (SSD)</strong>
+      The minimum distance required for a driver to perceive a stationary object in the travel path and bring the vehicle to a complete stop. Computed from perception-reaction distance plus braking distance.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Input Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="ssd-v" value="60" min="10" max="130" step="5">
+            <span class="ul" id="ssd-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Grade (+ up / − down)</label>
+          <div class="iw">
+            <input type="number" id="ssd-g" value="0" min="-15" max="15" step="0.5">
+            <span class="ul">%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider">Design Parameters</div>
+
+      <div class="grid">
+        <div class="fg">
+          <label>Perception-Reaction Time</label>
+          <div class="iw">
+            <input type="number" id="ssd-t" value="2.5" min="1" max="5" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Deceleration Rate</label>
+          <div class="iw">
+            <input type="number" id="ssd-a" value="11.2" min="5" max="25" step="0.1">
+            <span class="ul" id="ssd-a-u">ft/s²</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint">
+        AASHTO defaults: PRT = 2.5 s &nbsp;|&nbsp; Deceleration = <span id="ssd-a-note">11.2 ft/s² (0.35g)</span>.
+        Use a negative grade for downhill, positive for uphill.
+      </p>
+
+      <button class="btn" onclick="calcSSD()">Calculate SSD</button>
+    </div>
+
+    <div class="card" id="ssd-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri">
+          <div class="ri-label">Reaction Distance</div>
+          <div><span class="ri-value" id="ssd-dr">—</span><span class="ri-unit" id="ssd-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Braking Distance</div>
+          <div><span class="ri-value" id="ssd-db">—</span><span class="ri-unit" id="ssd-u2">ft</span></div>
+        </div>
+        <div class="ri hero">
+          <div class="ri-label">Total SSD</div>
+          <div><span class="ri-value" id="ssd-tot">—</span><span class="ri-unit" id="ssd-u3">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">AASHTO Min. SSD</div>
+          <div><span class="ri-value" id="ssd-min">—</span><span class="ri-unit" id="ssd-u4">ft</span></div>
+        </div>
+      </div>
+      <div class="cmp" id="ssd-cmp"><span class="cmp-icon"></span><span id="ssd-cmp-txt"></span></div>
+      <div class="fbox" id="ssd-formula"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PSD ═══════════════ -->
+  <div id="panel-psd" class="panel">
+
+    <div class="info">
+      <strong>Passing Sight Distance (PSD) — Two-Lane Highways</strong>
+      The minimum sight distance needed for a driver to safely overtake a slower vehicle. AASHTO uses a four-component model: d1 (initial maneuver) + d2 (opposing lane) + d3 (clearance) + d4 (opposing vehicle approach).
+    </div>
+
+    <div class="card">
+      <div class="card-title">Input Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="psd-v" value="60" min="20" max="130" step="5" oninput="autoFillPSD()">
+            <span class="ul" id="psd-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Speed Differential (m)</label>
+          <div class="iw">
+            <input type="number" id="psd-m" value="10" min="0" max="30" step="1">
+            <span class="ul" id="psd-m-u">mph</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider">AASHTO Component Parameters</div>
+
+      <div class="grid">
+        <div class="fg">
+          <label>t₁ — Initial Maneuver (s)</label>
+          <div class="iw">
+            <input type="number" id="psd-t1" value="4.0" min="1" max="10" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>a — Acceleration Rate</label>
+          <div class="iw">
+            <input type="number" id="psd-a" value="1.47" min="0.1" max="10" step="0.01">
+            <span class="ul" id="psd-a-u">mph/s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>t₂ — Time in Opposing Lane (s)</label>
+          <div class="iw">
+            <input type="number" id="psd-t2" value="10.7" min="1" max="25" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>d₃ — Clearance Distance</label>
+          <div class="iw">
+            <input type="number" id="psd-d3" value="200" min="0" max="500" step="10">
+            <span class="ul" id="psd-d3-u">ft</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint">Parameters are auto-populated from the AASHTO table based on design speed. Click "Auto-Fill" to refresh.</p>
+
+      <button class="btn" onclick="calcPSD()">Calculate PSD</button>
+      <button class="btn ghost" onclick="autoFillPSD()">Auto-Fill from AASHTO</button>
+    </div>
+
+    <div class="card" id="psd-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri">
+          <div class="ri-label">d₁ — Initial Maneuver</div>
+          <div><span class="ri-value" id="psd-d1v">—</span><span class="ri-unit" id="psd-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">d₂ — Opposing Lane</div>
+          <div><span class="ri-value" id="psd-d2v">—</span><span class="ri-unit" id="psd-u2">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">d₃ — Clearance</div>
+          <div><span class="ri-value" id="psd-d3v">—</span><span class="ri-unit" id="psd-u3">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">d₄ — Opposing Vehicle</div>
+          <div><span class="ri-value" id="psd-d4v">—</span><span class="ri-unit" id="psd-u4">ft</span></div>
+        </div>
+        <div class="ri hero">
+          <div class="ri-label">Total PSD</div>
+          <div><span class="ri-value" id="psd-tot">—</span><span class="ri-unit" id="psd-u5">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">AASHTO Min. PSD</div>
+          <div><span class="ri-value" id="psd-min">—</span><span class="ri-unit" id="psd-u6">ft</span></div>
+        </div>
+      </div>
+      <div class="cmp" id="psd-cmp"><span class="cmp-icon"></span><span id="psd-cmp-txt"></span></div>
+      <div class="fbox" id="psd-formula"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DSD ═══════════════ -->
+  <div id="panel-dsd" class="panel">
+
+    <div class="info">
+      <strong>Decision Sight Distance (DSD)</strong>
+      Provides additional sight distance where drivers must make complex or unexpected decisions (e.g., at-grade intersections, interchanges, changes in cross-section). Exceeds SSD to account for higher cognitive load.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Input Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="dsd-v" value="60" min="30" max="130" step="5">
+            <span class="ul" id="dsd-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Avoidance Maneuver Type</label>
+          <div class="iw">
+            <select id="dsd-type">
+              <option value="A">A — Stop on Rural Road</option>
+              <option value="B">B — Stop on Urban Road</option>
+              <option value="C">C — Speed/Path Change (Rural)</option>
+              <option value="D" selected>D — Speed/Path Change (Suburban)</option>
+              <option value="E">E — Speed/Path Change (Urban)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="btn" onclick="calcDSD()">Look Up DSD</button>
+    </div>
+
+    <div class="card" id="dsd-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri hero">
+          <div class="ri-label">Minimum DSD</div>
+          <div><span class="ri-value" id="dsd-tot">—</span><span class="ri-unit" id="dsd-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Reaction Time</div>
+          <div><span class="ri-value" id="dsd-t">—</span><span class="ri-unit">s</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">SSD at Same Speed</div>
+          <div><span class="ri-value" id="dsd-ssd">—</span><span class="ri-unit" id="dsd-u2">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">DSD / SSD Ratio</div>
+          <div><span class="ri-value" id="dsd-ratio">—</span><span class="ri-unit">×</span></div>
+        </div>
+      </div>
+      <div class="fbox" id="dsd-desc"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ REF ═══════════════ -->
+  <div id="panel-ref" class="panel">
+
+    <div class="card">
+      <div class="card-title">AASHTO Minimum Stopping Sight Distances</div>
+      <div class="tw"><table id="ssd-tbl">
+        <thead><tr>
+          <th id="ssd-th0">Speed (mph)</th>
+          <th id="ssd-th1">Reaction Dist.</th>
+          <th id="ssd-th2">Braking Dist.</th>
+          <th id="ssd-th3">Calc. SSD</th>
+          <th id="ssd-th4">AASHTO Min. SSD</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AASHTO Minimum Passing Sight Distances (Two-Lane Highways)</div>
+      <div class="tw"><table id="psd-tbl">
+        <thead><tr>
+          <th id="psd-th0">Speed (mph)</th>
+          <th>m (mph)</th>
+          <th>t₁ (s)</th>
+          <th>a (mph/s)</th>
+          <th>t₂ (s)</th>
+          <th id="psd-th5">d₃</th>
+          <th id="psd-th6">d₁</th>
+          <th id="psd-th7">d₂</th>
+          <th id="psd-th8">d₄</th>
+          <th id="psd-th9">Calc. PSD</th>
+          <th id="psd-th10">AASHTO Min.</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AASHTO Decision Sight Distances by Avoidance Maneuver Type</div>
+      <p class="hint" style="margin-bottom:.75rem">
+        Types A &amp; B involve stopping; types C–E involve speed/path/direction changes only.
+        Reaction times: A = 3.0 s &nbsp;|&nbsp; B = 9.1 s &nbsp;|&nbsp; C = 10.2 s &nbsp;|&nbsp; D = 12.1 s &nbsp;|&nbsp; E = 14.0 s
+      </p>
+      <div class="tw"><table id="dsd-tbl">
+        <thead><tr>
+          <th id="dsd-th0">Speed (mph)</th>
+          <th>Type A</th>
+          <th>Type B</th>
+          <th>Type C</th>
+          <th>Type D</th>
+          <th>Type E</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+  </div><!-- /ref -->
+
+</div><!-- /wrap -->
+
+<script>
+// ══════════════════════════════════════════════════════
+//  AASHTO DATA
+// ══════════════════════════════════════════════════════
+
+// SSD minimums  (source: AASHTO Green Book Table 3-1)
+const SSD_MIN_US = {20:115, 25:155, 30:200, 35:250, 40:305, 45:360,
+                    50:425, 55:495, 60:570, 65:645, 70:730, 75:820, 80:910};
+const SSD_MIN_SI = {30:35, 40:50, 50:65, 60:85, 70:105,
+                    80:130, 90:160, 100:185, 110:220, 120:250, 130:285};
+
+// PSD component parameters — AASHTO Green Book Table 3-4 (US)
+// { v, m, t1, a, t2, d3 }
+const PSD_PARAMS = [
+  {v:20, m:10, t1:3.6, a:1.40, t2:9.3,  d3:100},
+  {v:25, m:10, t1:3.6, a:1.43, t2:10.0, d3:100},
+  {v:30, m:10, t1:4.0, a:1.47, t2:10.7, d3:200},
+  {v:35, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:40, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:45, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:50, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:55, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:60, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:65, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:70, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+];
+
+// PSD minimums (source: AASHTO Green Book)
+const PSD_MIN_US = {20:800, 25:900, 30:1100, 35:1300, 40:1500,
+                    45:1800, 50:1800, 55:2100, 60:2100, 65:2300, 70:2500};
+const PSD_MIN_SI = {30:217, 40:285, 50:345, 60:407, 70:482,
+                    80:535, 90:590, 100:670, 110:728, 120:792};
+
+// DSD values (source: AASHTO Green Book Table 3-3)
+const DSD_US = [
+  {v:30,  A:220,  B:330,  C:490,  D:535,  E:580},
+  {v:35,  A:275,  B:410,  C:590,  D:645,  E:700},
+  {v:40,  A:330,  B:495,  C:690,  D:750,  E:820},
+  {v:45,  A:395,  B:585,  C:800,  D:865,  E:930},
+  {v:50,  A:465,  B:690,  C:910,  D:985,  E:1050},
+  {v:55,  A:535,  B:800,  C:1030, D:1105, E:1180},
+  {v:60,  A:610,  B:910,  C:1150, D:1220, E:1310},
+  {v:65,  A:695,  B:1030, C:1275, D:1365, E:1445},
+  {v:70,  A:780,  B:1150, C:1410, D:1510, E:1580},
+  {v:75,  A:875,  B:1285, C:1545, D:1650, E:1720},
+  {v:80,  A:970,  B:1420, C:1685, D:1795, E:1855},
+];
+
+const DSD_SI = [
+  {v:50,  A:75,  B:115, C:155, D:170, E:185},
+  {v:60,  A:100, B:150, C:195, D:215, E:235},
+  {v:70,  A:125, B:185, C:240, D:265, E:285},
+  {v:80,  A:155, B:225, C:285, D:315, E:340},
+  {v:90,  A:185, B:275, C:340, D:370, E:400},
+  {v:100, A:220, B:325, C:395, D:430, E:460},
+  {v:110, A:260, B:370, C:455, D:490, E:525},
+  {v:120, A:305, B:420, C:510, D:550, E:590},
+  {v:130, A:355, B:470, C:570, D:610, E:650},
+];
+
+const DSD_T = {A:3.0, B:9.1, C:10.2, D:12.1, E:14.0};
+
+const DSD_DESC = {
+  A: 'Stop on rural road — long approach, low visual complexity.',
+  B: 'Stop on urban road — congested environment, many competing stimuli.',
+  C: 'Speed/path/direction change on rural road — no stop required.',
+  D: 'Speed/path/direction change on suburban road — moderate complexity.',
+  E: 'Speed/path/direction change on urban road — high complexity, many stimuli.',
+};
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let units = 'us';
+
+// ══════════════════════════════════════════════════════
+//  UNIT SWITCH
+// ══════════════════════════════════════════════════════
+function setUnits(u) {
+  units = u;
+  document.getElementById('btn-us').classList.toggle('on', u === 'us');
+  document.getElementById('btn-si').classList.toggle('on', u === 'si');
+
+  const su = u === 'us' ? 'mph' : 'km/h';
+  const du = u === 'us' ? 'ft'  : 'm';
+  const au = u === 'us' ? 'ft/s²' : 'm/s²';
+
+  // SSD inputs
+  document.getElementById('ssd-v-u').textContent = su;
+  document.getElementById('ssd-a-u').textContent = au;
+  document.getElementById('ssd-a').value = u === 'us' ? 11.2 : 3.4;
+  document.getElementById('ssd-a-note').textContent = u === 'us'
+    ? '11.2 ft/s² (0.35g)' : '3.4 m/s² (0.347g)';
+  document.getElementById('ssd-v').value = u === 'us' ? 60 : 100;
+
+  // PSD inputs
+  document.getElementById('psd-v-u').textContent = su;
+  document.getElementById('psd-m-u').textContent = su;
+  document.getElementById('psd-a-u').textContent = u === 'us' ? 'mph/s' : 'km/h/s';
+  document.getElementById('psd-d3-u').textContent = du;
+  document.getElementById('psd-v').value = u === 'us' ? 60 : 100;
+
+  // DSD inputs
+  document.getElementById('dsd-v-u').textContent = su;
+  document.getElementById('dsd-v').value = u === 'us' ? 60 : 100;
+
+  // Hide stale results
+  ['ssd-out','psd-out','dsd-out'].forEach(id =>
+    document.getElementById(id).style.display = 'none');
+
+  autoFillPSD();
+  buildTables();
+}
+
+// ══════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('panel-' + name).classList.add('on');
+}
+
+// ══════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════
+function nearestRow(table, v) {
+  return table.reduce((best, row) =>
+    Math.abs(row.v - v) < Math.abs(best.v - v) ? row : best);
+}
+
+function lookupMin(obj, v) {
+  if (obj[v] !== undefined) return obj[v];
+  const keys = Object.keys(obj).map(Number).sort((a,b)=>a-b);
+  const nearest = keys.reduce((b,k) => Math.abs(k-v) < Math.abs(b-v) ? k : b);
+  return Math.abs(nearest - v) <= 15 ? obj[nearest] : null;
+}
+
+function ssdCalc(v, grade, prt, decel) {
+  const G = grade / 100;
+  const g = units === 'us' ? 32.2 : 9.81;
+  const a_g = decel / g;
+  const denom = a_g + G;
+  if (denom <= 0) return null;
+  let dr, db;
+  if (units === 'us') {
+    dr = 1.47 * v * prt;
+    db = (v * v) / (30 * denom);
+  } else {
+    dr = 0.278 * v * prt;
+    db = (v * v) / (254 * denom);
+  }
+  return { dr, db, ssd: dr + db };
+}
+
+// ══════════════════════════════════════════════════════
+//  SSD
+// ══════════════════════════════════════════════════════
+function calcSSD() {
+  const v    = parseFloat(document.getElementById('ssd-v').value);
+  const g    = parseFloat(document.getElementById('ssd-g').value);
+  const prt  = parseFloat(document.getElementById('ssd-t').value);
+  const decel= parseFloat(document.getElementById('ssd-a').value);
+
+  if ([v,g,prt,decel].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const res = ssdCalc(v, g, prt, decel);
+  if (!res) { alert('Invalid grade: deceleration minus grade is ≤ 0. Try a smaller negative grade.'); return; }
+
+  const { dr, db, ssd } = res;
+  const du = units === 'us' ? 'ft' : 'm';
+  const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
+  const minVal = lookupMin(minTable, v);
+
+  document.getElementById('ssd-dr').textContent = dr.toFixed(1);
+  document.getElementById('ssd-db').textContent = db.toFixed(1);
+  document.getElementById('ssd-tot').textContent = Math.ceil(ssd);
+  document.getElementById('ssd-min').textContent = minVal !== null ? minVal : 'N/A';
+  ['ssd-u1','ssd-u2','ssd-u3','ssd-u4'].forEach(id =>
+    document.getElementById(id).textContent = du);
+
+  const G = g / 100;
+  const a_g = decel / (units === 'us' ? 32.2 : 9.81);
+  const sign = G >= 0 ? '+' : '';
+
+  const cmp = document.getElementById('ssd-cmp');
+  if (minVal !== null) {
+    const pass = Math.ceil(ssd) >= minVal;
+    cmp.style.display = 'flex';
+    cmp.className = 'cmp ' + (pass ? 'pass' : 'fail');
+    cmp.querySelector('.cmp-icon').textContent = pass ? '✓' : '✕';
+    document.getElementById('ssd-cmp-txt').textContent = pass
+      ? `Calculated SSD (${Math.ceil(ssd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
+      : `Calculated SSD (${Math.ceil(ssd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
+  } else {
+    cmp.style.display = 'none';
+  }
+
+  const K = units === 'us' ? '1.47' : '0.278';
+  const D = units === 'us' ? '30' : '254';
+  document.getElementById('ssd-formula').textContent =
+    `SSD = ${K} × V × t  +  V² / (${D} × (a/g ${sign} G))\n`+
+    `    = ${K} × ${v} × ${prt}  +  ${v}² / (${D} × (${a_g.toFixed(3)} ${sign} ${Math.abs(G).toFixed(3)}))\n`+
+    `    = ${dr.toFixed(1)} + ${db.toFixed(1)}\n`+
+    `    = ${ssd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(ssd)} ${du}`;
+
+  document.getElementById('ssd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  PSD — AUTO-FILL
+// ══════════════════════════════════════════════════════
+function autoFillPSD() {
+  const v = parseFloat(document.getElementById('psd-v').value);
+  if (isNaN(v)) return;
+
+  let p;
+  if (units === 'us') {
+    p = nearestRow(PSD_PARAMS, v);
+    document.getElementById('psd-m').value  = p.m;
+    document.getElementById('psd-t1').value = p.t1;
+    document.getElementById('psd-a').value  = p.a;
+    document.getElementById('psd-t2').value = p.t2;
+    document.getElementById('psd-d3').value = p.d3;
+  } else {
+    // Convert AASHTO US params to SI
+    const vMph = v / 1.60934;
+    p = nearestRow(PSD_PARAMS, vMph);
+    document.getElementById('psd-m').value  = (p.m  * 1.60934).toFixed(1);
+    document.getElementById('psd-t1').value = p.t1;
+    document.getElementById('psd-a').value  = (p.a  * 1.60934).toFixed(2);
+    document.getElementById('psd-t2').value = p.t2;
+    document.getElementById('psd-d3').value = Math.round(p.d3 * 0.3048 / 10) * 10;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  PSD — CALCULATE
+// ══════════════════════════════════════════════════════
+function calcPSD() {
+  const v  = parseFloat(document.getElementById('psd-v').value);
+  const m  = parseFloat(document.getElementById('psd-m').value);
+  const t1 = parseFloat(document.getElementById('psd-t1').value);
+  const a  = parseFloat(document.getElementById('psd-a').value);
+  const t2 = parseFloat(document.getElementById('psd-t2').value);
+  const d3 = parseFloat(document.getElementById('psd-d3').value);
+
+  if ([v,m,t1,a,t2,d3].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const K = units === 'us' ? 1.47 : 0.278;
+  const d1 = K * t1 * (v - m + (a * t1) / 2);
+  const d2 = K * v * t2;
+  const d4 = (2/3) * d2;
+  const psd = d1 + d2 + d3 + d4;
+
+  const du = units === 'us' ? 'ft' : 'm';
+  const minTable = units === 'us' ? PSD_MIN_US : PSD_MIN_SI;
+  const minVal = lookupMin(minTable, v);
+
+  document.getElementById('psd-d1v').textContent = d1.toFixed(1);
+  document.getElementById('psd-d2v').textContent = d2.toFixed(1);
+  document.getElementById('psd-d3v').textContent = d3.toFixed(1);
+  document.getElementById('psd-d4v').textContent = d4.toFixed(1);
+  document.getElementById('psd-tot').textContent = Math.ceil(psd);
+  document.getElementById('psd-min').textContent = minVal !== null ? minVal : 'N/A';
+  for (let i=1;i<=6;i++)
+    document.getElementById('psd-u'+i).textContent = du;
+
+  const cmp = document.getElementById('psd-cmp');
+  if (minVal !== null) {
+    const pass = Math.ceil(psd) >= minVal;
+    cmp.style.display = 'flex';
+    cmp.className = 'cmp ' + (pass ? 'pass' : 'fail');
+    cmp.querySelector('.cmp-icon').textContent = pass ? '✓' : '✕';
+    document.getElementById('psd-cmp-txt').textContent = pass
+      ? `Calculated PSD (${Math.ceil(psd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
+      : `Calculated PSD (${Math.ceil(psd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
+  } else {
+    cmp.style.display = 'none';
+  }
+
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const Ks = units === 'us' ? '1.47' : '0.278';
+  document.getElementById('psd-formula').textContent =
+    `d₁ = ${Ks} × t₁ × (V − m + a·t₁/2)\n`+
+    `   = ${Ks} × ${t1} × (${v} − ${m} + ${a}×${t1}/2)\n`+
+    `   = ${d1.toFixed(1)} ${du}\n\n`+
+    `d₂ = ${Ks} × V × t₂  =  ${Ks} × ${v} × ${t2}  =  ${d2.toFixed(1)} ${du}\n\n`+
+    `d₃ = ${d3} ${du}  (clearance gap)\n\n`+
+    `d₄ = ⅔ × d₂  =  ⅔ × ${d2.toFixed(1)}  =  ${d4.toFixed(1)} ${du}\n\n`+
+    `PSD = ${d1.toFixed(1)} + ${d2.toFixed(1)} + ${d3} + ${d4.toFixed(1)}\n`+
+    `    = ${psd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(psd)} ${du}`;
+
+  document.getElementById('psd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  DSD
+// ══════════════════════════════════════════════════════
+function calcDSD() {
+  const v    = parseFloat(document.getElementById('dsd-v').value);
+  const type = document.getElementById('dsd-type').value;
+  if (isNaN(v)) { alert('Please enter a valid speed.'); return; }
+
+  const table = units === 'us' ? DSD_US : DSD_SI;
+  const row = nearestRow(table, v);
+  const dsd = row[type];
+  const t   = DSD_T[type];
+  const du  = units === 'us' ? 'ft' : 'm';
+  const su  = units === 'us' ? 'mph' : 'km/h';
+
+  // SSD at same speed for comparison (flat grade)
+  const decel = units === 'us' ? 11.2 : 3.4;
+  const res = ssdCalc(v, 0, 2.5, decel);
+  const ssdVal = res ? Math.ceil(res.ssd) : '—';
+  const ratio = res ? (dsd / Math.ceil(res.ssd)).toFixed(2) : '—';
+
+  document.getElementById('dsd-tot').textContent = dsd;
+  document.getElementById('dsd-t').textContent = t;
+  document.getElementById('dsd-ssd').textContent = ssdVal;
+  document.getElementById('dsd-ratio').textContent = ratio;
+  document.getElementById('dsd-u1').textContent = du;
+  document.getElementById('dsd-u2').textContent = du;
+
+  document.getElementById('dsd-desc').textContent =
+    `Type ${type}: ${DSD_DESC[type]}\n\n`+
+    `Tabulated speed: ${row.v} ${su} (nearest to ${v} ${su})\n`+
+    `Reaction / maneuver time assumed: ${t} s\n`+
+    `AASHTO minimum DSD: ${dsd} ${du}\n`+
+    `SSD at ${v} ${su} (flat, AASHTO defaults): ${ssdVal} ${du}\n`+
+    `DSD / SSD ratio: ${ratio}×`;
+
+  document.getElementById('dsd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  REFERENCE TABLES
+// ══════════════════════════════════════════════════════
+function buildTables() {
+  buildSSDTable();
+  buildPSDTable();
+  buildDSDTable();
+}
+
+function buildSSDTable() {
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const du = units === 'us' ? 'ft'  : 'm';
+  const speeds = units === 'us'
+    ? [20,25,30,35,40,45,50,55,60,65,70,75,80]
+    : [30,40,50,60,70,80,90,100,110,120,130];
+  const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
+  const decel    = units === 'us' ? 11.2 : 3.4;
+
+  document.getElementById('ssd-th0').textContent = `Speed (${su})`;
+  document.getElementById('ssd-th1').textContent = `Reaction Dist. (${du})`;
+  document.getElementById('ssd-th2').textContent = `Braking Dist. (${du})`;
+  document.getElementById('ssd-th3').textContent = `Calc. SSD (${du})`;
+  document.getElementById('ssd-th4').textContent = `AASHTO Min. (${du})`;
+
+  const tbody = document.querySelector('#ssd-tbl tbody');
+  tbody.innerHTML = '';
+  speeds.forEach(v => {
+    const r = ssdCalc(v, 0, 2.5, decel);
+    const min = minTable[v] || '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${v}</td><td>${r.dr.toFixed(0)}</td><td>${r.db.toFixed(0)}</td>`+
+                   `<td>${Math.ceil(r.ssd)}</td><td><strong>${min}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildPSDTable() {
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const du = units === 'us' ? 'ft'  : 'm';
+  const au = units === 'us' ? 'mph/s' : 'km/h/s';
+
+  document.getElementById('psd-th0').textContent  = `Speed (${su})`;
+  document.getElementById('psd-th5').textContent  = `d₃ (${du})`;
+  document.getElementById('psd-th6').textContent  = `d₁ (${du})`;
+  document.getElementById('psd-th7').textContent  = `d₂ (${du})`;
+  document.getElementById('psd-th8').textContent  = `d₄ (${du})`;
+  document.getElementById('psd-th9').textContent  = `Calc. PSD (${du})`;
+  document.getElementById('psd-th10').textContent = `AASHTO Min. (${du})`;
+
+  const K = units === 'us' ? 1.47 : 0.278;
+  const tbody = document.querySelector('#psd-tbl tbody');
+  tbody.innerHTML = '';
+
+  PSD_PARAMS.forEach(p => {
+    let v, m, a, d3;
+    if (units === 'us') {
+      v = p.v; m = p.m; a = p.a; d3 = p.d3;
+    } else {
+      v  = (p.v * 1.60934).toFixed(0) * 1;
+      m  = (p.m * 1.60934).toFixed(1) * 1;
+      a  = (p.a * 1.60934).toFixed(2) * 1;
+      d3 = Math.round(p.d3 * 0.3048 / 10) * 10;
+    }
+    const d1  = K * p.t1 * (v - m + (a * p.t1) / 2);
+    const d2  = K * v * p.t2;
+    const d4  = (2/3) * d2;
+    const psd = d1 + d2 + d3 + d4;
+    const minTable = units === 'us' ? PSD_MIN_US : PSD_MIN_SI;
+    const minVal = minTable[units === 'us' ? p.v : v] || '—';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${v}</td><td>${m}</td><td>${p.t1}</td><td>${a}</td><td>${p.t2}</td>`+
+      `<td>${d3}</td><td>${d1.toFixed(0)}</td><td>${d2.toFixed(0)}</td>`+
+      `<td>${d4.toFixed(0)}</td><td>${Math.ceil(psd)}</td>`+
+      `<td><strong>${minVal}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildDSDTable() {
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const du = units === 'us' ? 'ft'  : 'm';
+  document.getElementById('dsd-th0').textContent = `Speed (${su}) / DSD (${du})`;
+
+  const table = units === 'us' ? DSD_US : DSD_SI;
+  const tbody = document.querySelector('#dsd-tbl tbody');
+  tbody.innerHTML = '';
+  table.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.v}</td><td>${row.A}</td><td>${row.B}</td>`+
+                   `<td>${row.C}</td><td>${row.D}</td><td>${row.E}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  buildTables();
+  autoFillPSD();
+});
+</script>
+</body>
+</html>
