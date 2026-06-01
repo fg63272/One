@@ -332,6 +332,40 @@
       header h1 { font-size: 1.125rem; }
     }
   </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    #sightmap { height: 440px; }
+    .map-card-map { padding: 0; overflow: hidden; border-radius: .75rem; }
+    .map-status {
+      padding: .7rem 1rem;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: .45rem;
+      font-size: .875rem;
+      font-weight: 600;
+      color: #92400e;
+      line-height: 1.4;
+    }
+    .map-status.ready { background:#f0fdf4; border-color:#86efac; color:var(--green); }
+    .map-status.err   { background:#fef2f2; border-color:#fca5a5; color:var(--red);   }
+    .spinner-row {
+      display: none;
+      align-items: center;
+      gap: .5rem;
+      color: var(--muted);
+      font-size: .875rem;
+      margin-top: .75rem;
+    }
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
 
@@ -356,6 +390,7 @@
     <button class="tab"     onclick="showTab('psd',this)">Passing (PSD)</button>
     <button class="tab"     onclick="showTab('dsd',this)">Decision (DSD)</button>
     <button class="tab"     onclick="showTab('ref',this)">Reference Tables</button>
+    <button class="tab"     onclick="showTab('map',this)">Map / Grade Tool</button>
   </div>
 
   <!-- ═══════════════ SSD ═══════════════ -->
@@ -652,6 +687,102 @@
 
   </div><!-- /ref -->
 
+  <!-- ═══════════════ MAP ═══════════════ -->
+  <div id="panel-map" class="panel">
+
+    <div class="info">
+      <strong>Map-Based Grade &amp; Sight Distance Tool</strong>
+      Drop two pins along a road segment. The tool fetches real elevation data, computes the grade between the pins, and calculates the SSD for that location. Elevation data from SRTM (90 m resolution) via Open-Topo-Data — no API key required.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Design Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="map-v" value="60" min="10" max="130" step="5">
+            <span class="ul" id="map-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Perception-Reaction Time</label>
+          <div class="iw">
+            <input type="number" id="map-t" value="2.5" min="1" max="5" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Deceleration Rate</label>
+          <div class="iw">
+            <input type="number" id="map-a" value="11.2" min="5" max="25" step="0.1">
+            <span class="ul" id="map-a-u">ft/s²</span>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Grade is computed from the elevation difference between the two pins — no manual entry needed.</p>
+    </div>
+
+    <div class="card map-card-map">
+      <div id="sightmap"></div>
+    </div>
+
+    <div class="card" style="padding:1rem 1.25rem;">
+      <div id="map-status" class="map-status">
+        Step 1 — Click anywhere on the map to place <strong>Point A</strong> (driver position).
+      </div>
+      <div class="spinner-row" id="map-spinner">
+        <div class="spinner"></div>
+        <span>Fetching elevation data…</span>
+      </div>
+      <div style="margin-top:.75rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+        <button class="btn" style="margin-top:0;" onclick="recalcMap()" id="map-recalc-btn" disabled>Recalculate</button>
+        <button class="btn ghost" style="margin-top:0; margin-left:0;" onclick="resetMap()">Reset Pins</button>
+      </div>
+    </div>
+
+    <div class="card" id="map-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri">
+          <div class="ri-label">Elevation A</div>
+          <div><span class="ri-value" id="map-elev-a">—</span><span class="ri-unit">m</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Elevation B</div>
+          <div><span class="ri-value" id="map-elev-b">—</span><span class="ri-unit">m</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Segment Length</div>
+          <div><span class="ri-value" id="map-dist">—</span><span class="ri-unit" id="map-dist-u">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Computed Grade</div>
+          <div><span class="ri-value" id="map-grade">—</span><span class="ri-unit">%</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Reaction Dist.</div>
+          <div><span class="ri-value" id="map-dr">—</span><span class="ri-unit" id="map-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Braking Dist.</div>
+          <div><span class="ri-value" id="map-db">—</span><span class="ri-unit" id="map-u2">ft</span></div>
+        </div>
+        <div class="ri hero">
+          <div class="ri-label">SSD</div>
+          <div><span class="ri-value" id="map-ssd">—</span><span class="ri-unit" id="map-u3">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">AASHTO Min.</div>
+          <div><span class="ri-value" id="map-min">—</span><span class="ri-unit" id="map-u4">ft</span></div>
+        </div>
+      </div>
+      <div class="cmp" id="map-cmp"><span class="cmp-icon"></span><span id="map-cmp-txt"></span></div>
+      <div class="fbox" id="map-formula"></div>
+    </div>
+
+  </div><!-- /map -->
+
 </div><!-- /wrap -->
 
 <script>
@@ -760,6 +891,12 @@ function setUnits(u) {
   document.getElementById('dsd-v-u').textContent = su;
   document.getElementById('dsd-v').value = u === 'us' ? 60 : 100;
 
+  // Map inputs
+  document.getElementById('map-v-u').textContent = su;
+  document.getElementById('map-a-u').textContent = au;
+  document.getElementById('map-v').value = u === 'us' ? 60 : 100;
+  document.getElementById('map-a').value = u === 'us' ? 11.2 : 3.4;
+
   // Hide stale results
   ['ssd-out','psd-out','dsd-out'].forEach(id =>
     document.getElementById(id).style.display = 'none');
@@ -771,11 +908,14 @@ function setUnits(u) {
 // ══════════════════════════════════════════════════════
 //  TABS
 // ══════════════════════════════════════════════════════
+let mapInited = false;
+
 function showTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
   btn.classList.add('on');
   document.getElementById('panel-' + name).classList.add('on');
+  if (name === 'map' && !mapInited) { initMap(); mapInited = true; }
 }
 
 // ══════════════════════════════════════════════════════
@@ -1087,6 +1227,249 @@ function buildDSDTable() {
 }
 
 // ══════════════════════════════════════════════════════
+//  MAP / GRADE TOOL
+// ══════════════════════════════════════════════════════
+let _map = null;
+let _pins = [];          // [{lat, lng, marker}]
+let _overlays = [];      // L.layer objects to clear on reset
+let _lastElevs = null;   // cached elevation result for recalc
+
+function initMap() {
+  _map = L.map('sightmap').setView([39.5, -98.35], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(_map);
+  _map.on('click', onMapClick);
+}
+
+function onMapClick(e) {
+  const { lat, lng } = e.latlng;
+
+  if (_pins.length >= 2) { resetMap(); }
+
+  const label = _pins.length === 0 ? 'A' : 'B';
+  const color  = label === 'A' ? '#1a4b8c' : '#ea580c';
+
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:28px;height:28px;background:${color};border:2.5px solid #fff;
+           border-radius:50%;display:flex;align-items:center;justify-content:center;
+           color:#fff;font-weight:800;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.35)">
+           ${label}</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+  });
+
+  const marker = L.marker([lat, lng], { icon }).addTo(_map);
+  _pins.push({ lat, lng, marker });
+
+  if (_pins.length === 1) {
+    setMapStatus(`Step 2 — Click a second point along the road to define the direction and grade.`);
+  } else {
+    runMapCalc();
+  }
+}
+
+async function runMapCalc() {
+  const [A, B] = _pins;
+
+  // Draw segment line
+  const line = L.polyline([[A.lat, A.lng], [B.lat, B.lng]], {
+    color: '#1a4b8c', weight: 2.5, dashArray: '6 4', opacity: .8
+  }).addTo(_map);
+  _overlays.push(line);
+
+  // Show spinner
+  document.getElementById('map-spinner').style.display = 'flex';
+  setMapStatus('Fetching elevation data from SRTM…');
+  document.getElementById('map-out').style.display = 'none';
+  document.getElementById('map-recalc-btn').disabled = true;
+
+  try {
+    const res = await fetch(
+      `https://api.opentopodata.org/v1/srtm90m?locations=${A.lat},${A.lng}|${B.lat},${B.lng}`
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.status !== 'OK') throw new Error(data.status || 'API error');
+
+    const elevA = data.results[0].elevation;
+    const elevB = data.results[1].elevation;
+    if (elevA === null || elevB === null) throw new Error('No elevation data at one or both points (ocean/no-data area).');
+
+    _lastElevs = { elevA, elevB };
+    renderMapResults(A, B, elevA, elevB);
+
+  } catch (err) {
+    document.getElementById('map-spinner').style.display = 'none';
+    setMapStatus('Error: ' + err.message, 'err');
+  }
+}
+
+function renderMapResults(A, B, elevA, elevB) {
+  document.getElementById('map-spinner').style.display = 'none';
+
+  const speed = parseFloat(document.getElementById('map-v').value) || 60;
+  const prt   = parseFloat(document.getElementById('map-t').value) || 2.5;
+  const decel = parseFloat(document.getElementById('map-a').value) || 11.2;
+  const du    = units === 'us' ? 'ft' : 'm';
+  const su    = units === 'us' ? 'mph' : 'km/h';
+
+  // Horizontal distance (metres)
+  const distM = haversineM(A.lat, A.lng, B.lat, B.lng);
+  const distDisplay = units === 'us' ? distM * 3.28084 : distM;
+
+  // Grade always computed in metres
+  const gradePct = ((elevB - elevA) / distM) * 100;
+
+  // SSD
+  const res = ssdCalc(speed, gradePct, prt, decel);
+  if (!res) {
+    setMapStatus('Grade exceeds deceleration capacity — SSD undefined. Try a smaller downhill grade or increase deceleration.', 'err');
+    return;
+  }
+  const { dr, db, ssd } = res;
+  const ssdM = units === 'us' ? ssd * 0.3048 : ssd;
+
+  // ── Draw SSD circle (orange dashed ring)
+  const circle = L.circle([A.lat, A.lng], {
+    radius: ssdM,
+    color: '#ea580c',
+    fillColor: '#ea580c',
+    fillOpacity: .08,
+    weight: 2,
+    dashArray: '8 5'
+  }).addTo(_map);
+  _overlays.push(circle);
+
+  // ── Mark SSD endpoint along A→B bearing
+  const bearing = bearingRad(A.lat, A.lng, B.lat, B.lng);
+  const ep = destPoint(A.lat, A.lng, ssdM, bearing);
+  const epIcon = L.divIcon({
+    className: '',
+    html: `<div style="background:#ea580c;color:#fff;padding:2px 7px;border-radius:4px;
+           font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)">
+           SSD: ${Math.ceil(ssd)} ${du}</div>`,
+    iconAnchor: [0, 8]
+  });
+  const epMarker = L.marker([ep.lat, ep.lng], { icon: epIcon }).addTo(_map);
+  _overlays.push(epMarker);
+
+  // Fit map to show everything
+  const bounds = L.latLngBounds([
+    [A.lat, A.lng], [B.lat, B.lng], [ep.lat, ep.lng]
+  ]);
+  _map.fitBounds(bounds.pad(0.25));
+
+  // ── Update result card
+  const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
+  const minVal = lookupMin(minTable, speed);
+  const gradeSign = gradePct >= 0 ? '+' : '';
+
+  document.getElementById('map-elev-a').textContent = elevA.toFixed(1);
+  document.getElementById('map-elev-b').textContent = elevB.toFixed(1);
+  document.getElementById('map-dist').textContent   = distDisplay.toFixed(0);
+  document.getElementById('map-grade').textContent  = gradeSign + gradePct.toFixed(2);
+  document.getElementById('map-dr').textContent     = dr.toFixed(1);
+  document.getElementById('map-db').textContent     = db.toFixed(1);
+  document.getElementById('map-ssd').textContent    = Math.ceil(ssd);
+  document.getElementById('map-min').textContent    = minVal !== null ? minVal : 'N/A';
+  ['map-dist-u','map-u1','map-u2','map-u3','map-u4'].forEach(id =>
+    document.getElementById(id).textContent = du);
+
+  const cmp = document.getElementById('map-cmp');
+  if (minVal !== null) {
+    const pass = Math.ceil(ssd) >= minVal;
+    cmp.style.display = 'flex';
+    cmp.className = 'cmp ' + (pass ? 'pass' : 'fail');
+    cmp.querySelector('.cmp-icon').textContent = pass ? '✓' : '✕';
+    document.getElementById('map-cmp-txt').textContent = pass
+      ? `SSD (${Math.ceil(ssd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
+      : `SSD (${Math.ceil(ssd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
+  } else {
+    cmp.style.display = 'none';
+  }
+
+  const K   = units === 'us' ? '1.47' : '0.278';
+  const D   = units === 'us' ? '30'   : '254';
+  const G   = (gradePct / 100).toFixed(4);
+  const a_g = (decel / (units === 'us' ? 32.2 : 9.81)).toFixed(4);
+  document.getElementById('map-formula').textContent =
+    `Elevation A = ${elevA.toFixed(2)} m  |  Elevation B = ${elevB.toFixed(2)} m\n`+
+    `Horizontal distance = ${distM.toFixed(1)} m\n`+
+    `Grade G = (${elevB.toFixed(2)} − ${elevA.toFixed(2)}) / ${distM.toFixed(1)} = ${gradeSign}${gradePct.toFixed(3)} %\n\n`+
+    `SSD = ${K} × V × t  +  V² / (${D} × (a/g ${gradeSign} G))\n`+
+    `    = ${K} × ${speed} × ${prt}  +  ${speed}² / (${D} × (${a_g} ${gradeSign} ${Math.abs(gradePct/100).toFixed(4)}))\n`+
+    `    = ${dr.toFixed(1)} + ${db.toFixed(1)}\n`+
+    `    = ${ssd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(ssd)} ${du}`;
+
+  document.getElementById('map-out').style.display = 'block';
+  document.getElementById('map-recalc-btn').disabled = false;
+  setMapStatus(
+    `Grade: ${gradeSign}${gradePct.toFixed(2)}%  |  SSD: ${Math.ceil(ssd)} ${du} at ${speed} ${su}  —  Click map to reset and place new pins.`,
+    'ready'
+  );
+}
+
+function recalcMap() {
+  if (_pins.length < 2 || !_lastElevs) return;
+  // Clear only overlays (keep pins)
+  _overlays.forEach(o => _map.removeLayer(o));
+  _overlays = [];
+  const [A, B] = _pins;
+  renderMapResults(A, B, _lastElevs.elevA, _lastElevs.elevB);
+}
+
+function resetMap() {
+  _pins.forEach(p => _map.removeLayer(p.marker));
+  _overlays.forEach(o => _map.removeLayer(o));
+  _pins = [];
+  _overlays = [];
+  _lastElevs = null;
+  document.getElementById('map-out').style.display = 'none';
+  document.getElementById('map-spinner').style.display = 'none';
+  document.getElementById('map-recalc-btn').disabled = true;
+  setMapStatus('Step 1 — Click anywhere on the map to place <strong>Point A</strong> (driver position).');
+}
+
+function setMapStatus(msg, cls = '') {
+  const el = document.getElementById('map-status');
+  el.innerHTML = msg;
+  el.className = 'map-status' + (cls ? ' ' + cls : '');
+}
+
+// ── Geo helpers ──────────────────────────────────────
+function haversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function bearingRad(lat1, lng1, lat2, lng2) {
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δλ = (lng2 - lng1) * Math.PI/180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  return Math.atan2(y, x);
+}
+
+function destPoint(lat, lng, distM, bearingR) {
+  const R = 6371000;
+  const φ = lat * Math.PI/180, λ = lng * Math.PI/180;
+  const φ2 = Math.asin(Math.sin(φ)*Math.cos(distM/R) +
+              Math.cos(φ)*Math.sin(distM/R)*Math.cos(bearingR));
+  const λ2 = λ + Math.atan2(
+    Math.sin(bearingR)*Math.sin(distM/R)*Math.cos(φ),
+    Math.cos(distM/R) - Math.sin(φ)*Math.sin(φ2)
+  );
+  return { lat: φ2 * 180/Math.PI, lng: λ2 * 180/Math.PI };
+}
+
+// ══════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
@@ -1094,5 +1477,6 @@ document.addEventListener('DOMContentLoaded', () => {
   autoFillPSD();
 });
 </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
