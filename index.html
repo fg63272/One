@@ -1,0 +1,2029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AASHTO Sight Distance Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --blue:   #1a4b8c;
+      --blue2:  #2563eb;
+      --orange: #ea580c;
+      --bg:     #f1f5f9;
+      --card:   #ffffff;
+      --text:   #1e293b;
+      --muted:  #64748b;
+      --border: #e2e8f0;
+      --green:  #15803d;
+      --red:    #dc2626;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────── */
+    header {
+      background: linear-gradient(135deg, #0f2d5e 0%, var(--blue) 100%);
+      color: #fff;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header h1 { font-size: 1.375rem; font-weight: 700; letter-spacing: -.01em; }
+    header p  { font-size: .8125rem; opacity: .75; margin-top: .2rem; }
+
+    .units-row {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
+    .units-row span {
+      font-size: .8125rem;
+      font-weight: 600;
+      opacity: .8;
+    }
+    .toggle {
+      display: flex;
+      border: 1.5px solid rgba(255,255,255,.3);
+      border-radius: .4rem;
+      overflow: hidden;
+    }
+    .toggle button {
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,.7);
+      padding: .35rem .9rem;
+      font-size: .8125rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .toggle button.on {
+      background: rgba(255,255,255,.2);
+      color: #fff;
+    }
+
+    /* ── Container + Tabs ────────────────────────────── */
+    .wrap {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 2px solid var(--border);
+      margin-bottom: 1.5rem;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: .7rem 1.2rem;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 2.5px solid transparent;
+      margin-bottom: -2px;
+      white-space: nowrap;
+      transition: color .15s;
+    }
+    .tab:hover  { color: var(--blue); }
+    .tab.on     { color: var(--blue); border-bottom-color: var(--blue); }
+
+    .panel { display: none; }
+    .panel.on { display: block; }
+
+    /* ── Cards ───────────────────────────────────────── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,.05);
+    }
+    .card-title {
+      font-size: .9375rem;
+      font-weight: 700;
+      color: var(--blue);
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Info box ─────────────────────────────────────── */
+    .info {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-left: 3px solid var(--blue2);
+      border-radius: .5rem;
+      padding: .875rem 1rem;
+      font-size: .875rem;
+      color: #1d4ed8;
+      margin-bottom: 1.25rem;
+      line-height: 1.5;
+    }
+    .info strong { display: block; margin-bottom: .2rem; }
+
+    /* ── Form grid ───────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 1rem;
+    }
+
+    .fg { display: flex; flex-direction: column; gap: .35rem; }
+    .fg label {
+      font-size: .75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .iw {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid var(--border);
+      border-radius: .45rem;
+      background: #fff;
+      overflow: hidden;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .iw:focus-within {
+      border-color: var(--blue2);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+    .iw input, .iw select {
+      flex: 1;
+      border: none;
+      outline: none;
+      padding: .575rem .75rem;
+      font-size: .9375rem;
+      color: var(--text);
+      background: transparent;
+      min-width: 0;
+    }
+    .iw select { cursor: pointer; }
+    .ul {
+      padding: 0 .7rem;
+      font-size: .75rem;
+      color: var(--muted);
+      border-left: 1px solid var(--border);
+      background: #f8fafc;
+      white-space: nowrap;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+    }
+
+    .hint {
+      font-size: .78125rem;
+      color: var(--muted);
+      margin-top: .6rem;
+      line-height: 1.5;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: .65rem;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      margin: 1.2rem 0;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .btn {
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: .45rem;
+      padding: .65rem 1.75rem;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 1rem;
+      transition: background .15s, transform .1s, box-shadow .15s;
+    }
+    .btn:hover {
+      background: var(--blue2);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(37,99,235,.3);
+    }
+    .btn.ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1.5px solid var(--border);
+      margin-left: .5rem;
+    }
+    .btn.ghost:hover { background: var(--bg); transform: none; box-shadow: none; }
+
+    /* ── Results grid ─────────────────────────────────── */
+    .rg {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+      gap: .875rem;
+    }
+    .ri {
+      background: var(--bg);
+      border-radius: .5rem;
+      padding: .875rem;
+      text-align: center;
+    }
+    .ri.hero {
+      background: var(--blue);
+      color: #fff;
+    }
+    .ri-label {
+      font-size: .6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--muted);
+      margin-bottom: .4rem;
+    }
+    .ri.hero .ri-label { color: rgba(255,255,255,.65); }
+    .ri-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--blue);
+      line-height: 1;
+    }
+    .ri.hero .ri-value { color: #fff; }
+    .ri-unit {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-left: .15rem;
+    }
+    .ri.hero .ri-unit { color: rgba(255,255,255,.65); }
+
+    /* ── Comparison banner ────────────────────────────── */
+    .cmp {
+      display: none;
+      align-items: center;
+      gap: .75rem;
+      padding: .7rem 1rem;
+      border-radius: .45rem;
+      font-size: .875rem;
+      font-weight: 700;
+      margin-top: 1rem;
+    }
+    .cmp.pass { background: #f0fdf4; border: 1px solid #86efac; color: var(--green); }
+    .cmp.fail { background: #fef2f2; border: 1px solid #fca5a5; color: var(--red);   }
+    .cmp-icon { font-size: 1.1rem; }
+
+    /* ── Formula box ──────────────────────────────────── */
+    .fbox {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--blue);
+      border-radius: .35rem;
+      padding: .75rem 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: .8125rem;
+      color: #334155;
+      margin-top: 1rem;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    /* ── Reference tables ─────────────────────────────── */
+    .tw { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
+    th {
+      background: var(--blue);
+      color: #fff;
+      padding: .55rem .75rem;
+      font-size: .75rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    td {
+      padding: .45rem .75rem;
+      text-align: center;
+      border-bottom: 1px solid var(--border);
+    }
+    tr:nth-child(even) td { background: #f8fafc; }
+    tr:hover td { background: #eff6ff; }
+    td strong { color: var(--blue); }
+
+    @media (max-width: 550px) {
+      .grid { grid-template-columns: 1fr 1fr; }
+      header { padding: 1rem; }
+      header h1 { font-size: 1.125rem; }
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    #sightmap { height: 440px; }
+    .map-card-map { padding: 0; overflow: hidden; border-radius: .75rem; }
+    .map-status {
+      padding: .7rem 1rem;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: .45rem;
+      font-size: .875rem;
+      font-weight: 600;
+      color: #92400e;
+      line-height: 1.4;
+    }
+    .map-status.ready { background:#f0fdf4; border-color:#86efac; color:var(--green); }
+    .map-status.err   { background:#fef2f2; border-color:#fca5a5; color:var(--red);   }
+    .spinner-row {
+      display: none;
+      align-items: center;
+      gap: .5rem;
+      color: var(--muted);
+      font-size: .875rem;
+      margin-top: .75rem;
+    }
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ISD case selector ─────────────────────────── */
+    .isd-sel {
+      display: flex;
+      border: 1.5px solid var(--border);
+      border-radius: .5rem;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .isd-btn {
+      flex: 1;
+      padding: .65rem 1rem;
+      border: none;
+      border-right: 1px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--muted);
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .isd-btn:last-child { border-right: none; }
+    .isd-btn:hover { color: var(--blue); background: #eff6ff; }
+    .isd-btn.on { background: var(--blue); color: #fff; }
+    .isd-case-desc {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--orange);
+      border-radius: .45rem;
+      padding: .75rem 1rem;
+      font-size: .8125rem;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+    .isd-case-desc strong { color: var(--orange); display: block; margin-bottom: .2rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AASHTO Sight Distance Calculator</h1>
+    <p>Highway Geometric Design — AASHTO Green Book Reference</p>
+  </div>
+  <div class="units-row">
+    <span>Units:</span>
+    <div class="toggle">
+      <button id="btn-us" class="on" onclick="setUnits('us')">US Customary</button>
+      <button id="btn-si"          onclick="setUnits('si')">Metric (SI)</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tabs">
+    <button class="tab on"  onclick="showTab('ssd',this)">Stopping (SSD)</button>
+    <button class="tab"     onclick="showTab('psd',this)">Passing (PSD)</button>
+    <button class="tab"     onclick="showTab('dsd',this)">Decision (DSD)</button>
+    <button class="tab"     onclick="showTab('isd',this)">Intersection (ISD)</button>
+    <button class="tab"     onclick="showTab('ref',this)">Reference Tables</button>
+    <button class="tab"     onclick="showTab('map',this)">Map / Grade Tool</button>
+  </div>
+
+  <!-- ═══════════════ SSD ═══════════════ -->
+  <div id="panel-ssd" class="panel on">
+
+    <div class="info">
+      <strong>Stopping Sight Distance (SSD)</strong>
+      The minimum distance required for a driver to perceive a stationary object in the travel path and bring the vehicle to a complete stop. Computed from perception-reaction distance plus braking distance.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Input Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="ssd-v" value="60" min="10" max="130" step="5">
+            <span class="ul" id="ssd-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Grade (+ up / − down)</label>
+          <div class="iw">
+            <input type="number" id="ssd-g" value="0" min="-15" max="15" step="0.5">
+            <span class="ul">%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider">Design Parameters</div>
+
+      <div class="grid">
+        <div class="fg">
+          <label>Perception-Reaction Time</label>
+          <div class="iw">
+            <input type="number" id="ssd-t" value="2.5" min="1" max="5" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Deceleration Rate</label>
+          <div class="iw">
+            <input type="number" id="ssd-a" value="11.2" min="5" max="25" step="0.1">
+            <span class="ul" id="ssd-a-u">ft/s²</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint">
+        AASHTO defaults: PRT = 2.5 s &nbsp;|&nbsp; Deceleration = <span id="ssd-a-note">11.2 ft/s² (0.35g)</span>.
+        Use a negative grade for downhill, positive for uphill.
+      </p>
+
+      <button class="btn" onclick="calcSSD()">Calculate SSD</button>
+    </div>
+
+    <div class="card" id="ssd-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri">
+          <div class="ri-label">Reaction Distance</div>
+          <div><span class="ri-value" id="ssd-dr">—</span><span class="ri-unit" id="ssd-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Braking Distance</div>
+          <div><span class="ri-value" id="ssd-db">—</span><span class="ri-unit" id="ssd-u2">ft</span></div>
+        </div>
+        <div class="ri hero">
+          <div class="ri-label">Total SSD</div>
+          <div><span class="ri-value" id="ssd-tot">—</span><span class="ri-unit" id="ssd-u3">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">AASHTO Min. SSD</div>
+          <div><span class="ri-value" id="ssd-min">—</span><span class="ri-unit" id="ssd-u4">ft</span></div>
+        </div>
+      </div>
+      <div class="cmp" id="ssd-cmp"><span class="cmp-icon"></span><span id="ssd-cmp-txt"></span></div>
+      <div class="fbox" id="ssd-formula"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ PSD ═══════════════ -->
+  <div id="panel-psd" class="panel">
+
+    <div class="info">
+      <strong>Passing Sight Distance (PSD) — Two-Lane Highways</strong>
+      The minimum sight distance needed for a driver to safely overtake a slower vehicle. AASHTO uses a four-component model: d1 (initial maneuver) + d2 (opposing lane) + d3 (clearance) + d4 (opposing vehicle approach).
+    </div>
+
+    <div class="card">
+      <div class="card-title">Input Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="psd-v" value="60" min="20" max="130" step="5" oninput="autoFillPSD()">
+            <span class="ul" id="psd-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Speed Differential (m)</label>
+          <div class="iw">
+            <input type="number" id="psd-m" value="10" min="0" max="30" step="1">
+            <span class="ul" id="psd-m-u">mph</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider">AASHTO Component Parameters</div>
+
+      <div class="grid">
+        <div class="fg">
+          <label>t₁ — Initial Maneuver (s)</label>
+          <div class="iw">
+            <input type="number" id="psd-t1" value="4.0" min="1" max="10" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>a — Acceleration Rate</label>
+          <div class="iw">
+            <input type="number" id="psd-a" value="1.47" min="0.1" max="10" step="0.01">
+            <span class="ul" id="psd-a-u">mph/s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>t₂ — Time in Opposing Lane (s)</label>
+          <div class="iw">
+            <input type="number" id="psd-t2" value="10.7" min="1" max="25" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>d₃ — Clearance Distance</label>
+          <div class="iw">
+            <input type="number" id="psd-d3" value="200" min="0" max="500" step="10">
+            <span class="ul" id="psd-d3-u">ft</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="hint">Parameters are auto-populated from the AASHTO table based on design speed. Click "Auto-Fill" to refresh.</p>
+
+      <button class="btn" onclick="calcPSD()">Calculate PSD</button>
+      <button class="btn ghost" onclick="autoFillPSD()">Auto-Fill from AASHTO</button>
+    </div>
+
+    <div class="card" id="psd-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri">
+          <div class="ri-label">d₁ — Initial Maneuver</div>
+          <div><span class="ri-value" id="psd-d1v">—</span><span class="ri-unit" id="psd-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">d₂ — Opposing Lane</div>
+          <div><span class="ri-value" id="psd-d2v">—</span><span class="ri-unit" id="psd-u2">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">d₃ — Clearance</div>
+          <div><span class="ri-value" id="psd-d3v">—</span><span class="ri-unit" id="psd-u3">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">d₄ — Opposing Vehicle</div>
+          <div><span class="ri-value" id="psd-d4v">—</span><span class="ri-unit" id="psd-u4">ft</span></div>
+        </div>
+        <div class="ri hero">
+          <div class="ri-label">Total PSD</div>
+          <div><span class="ri-value" id="psd-tot">—</span><span class="ri-unit" id="psd-u5">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">AASHTO Min. PSD</div>
+          <div><span class="ri-value" id="psd-min">—</span><span class="ri-unit" id="psd-u6">ft</span></div>
+        </div>
+      </div>
+      <div class="cmp" id="psd-cmp"><span class="cmp-icon"></span><span id="psd-cmp-txt"></span></div>
+      <div class="fbox" id="psd-formula"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ DSD ═══════════════ -->
+  <div id="panel-dsd" class="panel">
+
+    <div class="info">
+      <strong>Decision Sight Distance (DSD)</strong>
+      Provides additional sight distance where drivers must make complex or unexpected decisions (e.g., at-grade intersections, interchanges, changes in cross-section). Exceeds SSD to account for higher cognitive load.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Input Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="dsd-v" value="60" min="30" max="130" step="5">
+            <span class="ul" id="dsd-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Avoidance Maneuver Type</label>
+          <div class="iw">
+            <select id="dsd-type">
+              <option value="A">A — Stop on Rural Road</option>
+              <option value="B">B — Stop on Urban Road</option>
+              <option value="C">C — Speed/Path Change (Rural)</option>
+              <option value="D" selected>D — Speed/Path Change (Suburban)</option>
+              <option value="E">E — Speed/Path Change (Urban)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="btn" onclick="calcDSD()">Look Up DSD</button>
+    </div>
+
+    <div class="card" id="dsd-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri hero">
+          <div class="ri-label">Minimum DSD</div>
+          <div><span class="ri-value" id="dsd-tot">—</span><span class="ri-unit" id="dsd-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Reaction Time</div>
+          <div><span class="ri-value" id="dsd-t">—</span><span class="ri-unit">s</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">SSD at Same Speed</div>
+          <div><span class="ri-value" id="dsd-ssd">—</span><span class="ri-unit" id="dsd-u2">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">DSD / SSD Ratio</div>
+          <div><span class="ri-value" id="dsd-ratio">—</span><span class="ri-unit">×</span></div>
+        </div>
+      </div>
+      <div class="fbox" id="dsd-desc"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ ISD ═══════════════ -->
+  <div id="panel-isd" class="panel">
+
+    <div class="info">
+      <strong>Intersection Sight Distance (ISD) — AASHTO Green Book</strong>
+      Select a control case. ISD defines the required sight triangle leg(s) so drivers have adequate time to see and react to conflicting traffic at an intersection.
+    </div>
+
+    <div class="isd-sel">
+      <button class="isd-btn"    onclick="showISDCase('A',this)">Case A — No Control</button>
+      <button class="isd-btn on" onclick="showISDCase('B',this)">Case B — Stop Control</button>
+      <button class="isd-btn"    onclick="showISDCase('F',this)">Case F — Major-Road Left Turn</button>
+    </div>
+
+    <!-- ══ Case A ══ -->
+    <div id="isd-panel-A" class="isd-panel" style="display:none">
+      <div class="isd-case-desc">
+        <strong>Case A — No Traffic Control (Equal Priority)</strong>
+        Both roads have equal right-of-way. Each approach leg of the sight triangle must be at least equal to the SSD at that road's design speed. Uses the standard SSD formula with AASHTO defaults (PRT = 2.5 s, a = 11.2 ft/s²).
+      </div>
+      <div class="card">
+        <div class="card-title">Input Parameters</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Major Road Design Speed</label>
+            <div class="iw"><input type="number" id="a-v-maj" value="50" min="15" max="130" step="5"><span class="ul" id="a-v-maj-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Minor Road Design Speed</label>
+            <div class="iw"><input type="number" id="a-v-min" value="30" min="15" max="130" step="5"><span class="ul" id="a-v-min-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Major Road Grade (+ up / − down)</label>
+            <div class="iw"><input type="number" id="a-g-maj" value="0" min="-15" max="15" step="0.5"><span class="ul">%</span></div>
+          </div>
+          <div class="fg">
+            <label>Minor Road Grade (+ up / − down)</label>
+            <div class="iw"><input type="number" id="a-g-min" value="0" min="-15" max="15" step="0.5"><span class="ul">%</span></div>
+          </div>
+        </div>
+        <button class="btn" onclick="calcISD_A()">Calculate Case A ISD</button>
+      </div>
+      <div class="card" id="a-out" style="display:none">
+        <div class="card-title">Results</div>
+        <div class="rg">
+          <div class="ri hero">
+            <div class="ri-label">Major Road Leg</div>
+            <div><span class="ri-value" id="a-maj">—</span><span class="ri-unit" id="a-u1">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Reaction Dist. (Major)</div>
+            <div><span class="ri-value" id="a-maj-dr">—</span><span class="ri-unit" id="a-u2">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Braking Dist. (Major)</div>
+            <div><span class="ri-value" id="a-maj-db">—</span><span class="ri-unit" id="a-u3">ft</span></div>
+          </div>
+          <div class="ri hero">
+            <div class="ri-label">Minor Road Leg</div>
+            <div><span class="ri-value" id="a-min">—</span><span class="ri-unit" id="a-u4">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Reaction Dist. (Minor)</div>
+            <div><span class="ri-value" id="a-min-dr">—</span><span class="ri-unit" id="a-u5">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Braking Dist. (Minor)</div>
+            <div><span class="ri-value" id="a-min-db">—</span><span class="ri-unit" id="a-u6">ft</span></div>
+          </div>
+        </div>
+        <div class="fbox" id="a-formula"></div>
+      </div>
+    </div>
+
+    <!-- ══ Case B ══ -->
+    <div id="isd-panel-B" class="isd-panel">
+      <div class="isd-case-desc">
+        <strong>Case B — Stop Control on the Minor Road (Departure Sight Triangle)</strong>
+        A driver who has stopped on the minor road must be able to see far enough along the major road that the available gap is long enough to complete the maneuver. Sub-cases: <strong>B1</strong> left turn, <strong>B2</strong> right turn, <strong>B3</strong> crossing. ISD = 1.47 × V × t<sub>g</sub> (US) or 0.278 × V × t<sub>g</sub> (SI).
+      </div>
+      <div class="card">
+        <div class="card-title">Input Parameters</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Major Road Design Speed</label>
+            <div class="iw"><input type="number" id="isd-v" value="60" min="15" max="130" step="5"><span class="ul" id="isd-v-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Case B Maneuver</label>
+            <div class="iw">
+              <select id="isd-case" onchange="onIsdCaseChange()">
+                <option value="B1" selected>B1 — Left Turn from Minor Road</option>
+                <option value="B2">B2 — Right Turn from Minor Road</option>
+                <option value="B3">B3 — Crossing Maneuver</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label>Design Vehicle</label>
+            <div class="iw">
+              <select id="isd-veh">
+                <option value="pc" selected>Passenger Car</option>
+                <option value="su">Single-Unit Truck</option>
+                <option value="combo">Combination Truck</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="divider">Adjustments</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Lanes Crossed by Vehicle</label>
+            <div class="iw"><input type="number" id="isd-lanes" value="1" min="1" max="8" step="1"><span class="ul">lanes</span></div>
+          </div>
+          <div class="fg">
+            <label>Minor-Road Approach Grade</label>
+            <div class="iw"><input type="number" id="isd-grade" value="0" min="-10" max="15" step="0.5"><span class="ul">%</span></div>
+          </div>
+        </div>
+        <p class="hint">
+          <strong>Lane adj.</strong> (B1 &amp; B3): +0.5 s/lane (PC) or +0.7 s/lane (truck) for each lane beyond one.
+          <strong>Grade adj.</strong> (B1 &amp; B3): +0.2 s per % of upgrade exceeding 3%. B2 right turns take no adjustments.
+        </p>
+        <button class="btn" onclick="calcISD()">Calculate Case B ISD</button>
+      </div>
+      <div class="card" id="isd-out" style="display:none">
+        <div class="card-title">Results</div>
+        <div class="rg">
+          <div class="ri"><div class="ri-label">Base Time Gap</div><div><span class="ri-value" id="isd-tgbase">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Lane Adjustment</div><div><span class="ri-value" id="isd-adjlane">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Grade Adjustment</div><div><span class="ri-value" id="isd-adjgrade">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Adjusted t<sub>g</sub></div><div><span class="ri-value" id="isd-tg">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri hero"><div class="ri-label">ISD — Major Road Leg</div><div><span class="ri-value" id="isd-tot">—</span><span class="ri-unit" id="isd-u1">ft</span></div></div>
+          <div class="ri"><div class="ri-label">Minor Road Set-Back</div><div><span class="ri-value" id="isd-leg">—</span><span class="ri-unit" id="isd-u2">ft</span></div></div>
+        </div>
+        <div class="fbox" id="isd-formula"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Case B Base Critical Time Gaps (t<sub>g</sub>)</div>
+        <div class="tw"><table>
+          <thead><tr><th>Design Vehicle</th><th>B1 Left Turn</th><th>B2 Right Turn</th><th>B3 Crossing</th></tr></thead>
+          <tbody>
+            <tr><td>Passenger Car</td><td>7.5 s</td><td>6.5 s</td><td>6.5 s</td></tr>
+            <tr><td>Single-Unit Truck</td><td>9.5 s</td><td>8.5 s</td><td>8.5 s</td></tr>
+            <tr><td>Combination Truck</td><td>11.5 s</td><td>10.5 s</td><td>10.5 s</td></tr>
+          </tbody>
+        </table></div>
+        <p class="hint">Assumes two-lane major road, grade ≤ 3%. Source: AASHTO Green Book, Exhibit 3-54.</p>
+      </div>
+    </div>
+
+    <!-- ══ Case F ══ -->
+    <div id="isd-panel-F" class="isd-panel" style="display:none">
+      <div class="isd-case-desc">
+        <strong>Case F — Left Turn from the Major Road (Departure Sight Triangle)</strong>
+        A driver on the major road waiting to turn left must see far enough along the major road (opposing traffic) to complete the turn safely, and far enough along the minor road (cross-street traffic) to avoid a collision. Two sight triangle legs are required.
+      </div>
+      <div class="card">
+        <div class="card-title">Input Parameters</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Major Road Speed (opposing)</label>
+            <div class="iw"><input type="number" id="f-v-maj" value="50" min="15" max="130" step="5"><span class="ul" id="f-v-maj-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Cross-Street (Minor Road) Speed</label>
+            <div class="iw"><input type="number" id="f-v-min" value="30" min="15" max="130" step="5"><span class="ul" id="f-v-min-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Design Vehicle</label>
+            <div class="iw">
+              <select id="f-veh">
+                <option value="pc" selected>Passenger Car</option>
+                <option value="su">Single-Unit Truck</option>
+                <option value="combo">Combination Truck</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label>Opposing Lanes Crossed</label>
+            <div class="iw"><input type="number" id="f-lanes" value="1" min="1" max="6" step="1"><span class="ul">lanes</span></div>
+          </div>
+        </div>
+        <p class="hint">
+          Base t<sub>g</sub> for Case F (PC = 5.5 s, SU = 7.5 s, Combo = 9.5 s).
+          Lane adjustment: +0.5 s (PC) / +0.7 s (truck) per opposing lane beyond one.
+          Minor road leg = SSD at cross-street speed (flat, AASHTO defaults).
+        </p>
+        <button class="btn" onclick="calcISD_F()">Calculate Case F ISD</button>
+      </div>
+      <div class="card" id="f-out" style="display:none">
+        <div class="card-title">Results</div>
+        <div class="rg">
+          <div class="ri"><div class="ri-label">Base Time Gap</div><div><span class="ri-value" id="f-tgbase">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Lane Adjustment</div><div><span class="ri-value" id="f-adjlane">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Adjusted t<sub>g</sub></div><div><span class="ri-value" id="f-tg">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri hero"><div class="ri-label">Leg Along Major Road</div><div><span class="ri-value" id="f-maj">—</span><span class="ri-unit" id="f-u1">ft</span></div></div>
+          <div class="ri hero"><div class="ri-label">Leg Along Minor Road</div><div><span class="ri-value" id="f-min">—</span><span class="ri-unit" id="f-u2">ft</span></div></div>
+        </div>
+        <div class="fbox" id="f-formula"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Case F Base Critical Time Gaps (t<sub>g</sub>)</div>
+        <div class="tw"><table>
+          <thead><tr><th>Design Vehicle</th><th>t<sub>g</sub> (base)</th><th>Lane Inc.</th></tr></thead>
+          <tbody>
+            <tr><td>Passenger Car</td><td>5.5 s</td><td>+0.5 s/lane</td></tr>
+            <tr><td>Single-Unit Truck</td><td>7.5 s</td><td>+0.7 s/lane</td></tr>
+            <tr><td>Combination Truck</td><td>9.5 s</td><td>+0.7 s/lane</td></tr>
+          </tbody>
+        </table></div>
+        <p class="hint">Assumes two-lane major road (1 opposing lane). Source: AASHTO Green Book, Exhibit 3-55 / Case F departure sight triangle.</p>
+      </div>
+    </div>
+
+  </div><!-- /isd -->
+
+  <!-- ═══════════════ REF ═══════════════ -->
+  <div id="panel-ref" class="panel">
+
+    <div class="card">
+      <div class="card-title">AASHTO Minimum Stopping Sight Distances</div>
+      <div class="tw"><table id="ssd-tbl">
+        <thead><tr>
+          <th id="ssd-th0">Speed (mph)</th>
+          <th id="ssd-th1">Reaction Dist.</th>
+          <th id="ssd-th2">Braking Dist.</th>
+          <th id="ssd-th3">Calc. SSD</th>
+          <th id="ssd-th4">AASHTO Min. SSD</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AASHTO Minimum Passing Sight Distances (Two-Lane Highways)</div>
+      <div class="tw"><table id="psd-tbl">
+        <thead><tr>
+          <th id="psd-th0">Speed (mph)</th>
+          <th>m (mph)</th>
+          <th>t₁ (s)</th>
+          <th>a (mph/s)</th>
+          <th>t₂ (s)</th>
+          <th id="psd-th5">d₃</th>
+          <th id="psd-th6">d₁</th>
+          <th id="psd-th7">d₂</th>
+          <th id="psd-th8">d₄</th>
+          <th id="psd-th9">Calc. PSD</th>
+          <th id="psd-th10">AASHTO Min.</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AASHTO Decision Sight Distances by Avoidance Maneuver Type</div>
+      <p class="hint" style="margin-bottom:.75rem">
+        Types A &amp; B involve stopping; types C–E involve speed/path/direction changes only.
+        Reaction times: A = 3.0 s &nbsp;|&nbsp; B = 9.1 s &nbsp;|&nbsp; C = 10.2 s &nbsp;|&nbsp; D = 12.1 s &nbsp;|&nbsp; E = 14.0 s
+      </p>
+      <div class="tw"><table id="dsd-tbl">
+        <thead><tr>
+          <th id="dsd-th0">Speed (mph)</th>
+          <th>Type A</th>
+          <th>Type B</th>
+          <th>Type C</th>
+          <th>Type D</th>
+          <th>Type E</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">AASHTO Intersection Sight Distances — Passenger Car, Two-Lane, Flat Grade</div>
+      <p class="hint" style="margin-bottom:.75rem">
+        Case A: both legs = SSD (PRT 2.5 s, a = 11.2 ft/s²) &nbsp;|&nbsp;
+        Case B: ISD = 1.47 × V × t<sub>g</sub> (base gaps: B1 = 7.5 s, B2/B3 = 6.5 s) &nbsp;|&nbsp;
+        Case F: major-road leg = 1.47 × V × 5.5 s; minor-road leg = SSD at cross-street speed.
+      </p>
+      <div class="tw"><table id="isd-tbl">
+        <thead><tr>
+          <th id="isd-th0">Speed (mph)</th>
+          <th id="isd-th-a">Case A — SSD Leg</th>
+          <th id="isd-th1">B1 Left (7.5 s)</th>
+          <th id="isd-th2">B2/B3 Right/Cross (6.5 s)</th>
+          <th id="isd-th-f">Case F Major Leg (5.5 s)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+  </div><!-- /ref -->
+
+  <!-- ═══════════════ MAP ═══════════════ -->
+  <div id="panel-map" class="panel">
+
+    <div class="info">
+      <strong>Map-Based Grade &amp; Sight Distance Tool</strong>
+      Drop two pins along a road segment. The tool fetches real elevation data, computes the grade between the pins, and calculates the SSD for that location. Elevation data from SRTM (90 m resolution) via Open-Topo-Data — no API key required.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Design Parameters</div>
+      <div class="grid">
+        <div class="fg">
+          <label>Design Speed</label>
+          <div class="iw">
+            <input type="number" id="map-v" value="60" min="10" max="130" step="5">
+            <span class="ul" id="map-v-u">mph</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Perception-Reaction Time</label>
+          <div class="iw">
+            <input type="number" id="map-t" value="2.5" min="1" max="5" step="0.1">
+            <span class="ul">s</span>
+          </div>
+        </div>
+        <div class="fg">
+          <label>Deceleration Rate</label>
+          <div class="iw">
+            <input type="number" id="map-a" value="11.2" min="5" max="25" step="0.1">
+            <span class="ul" id="map-a-u">ft/s²</span>
+          </div>
+        </div>
+      </div>
+      <p class="hint">Grade is computed from the elevation difference between the two pins — no manual entry needed.</p>
+    </div>
+
+    <div class="card map-card-map">
+      <div id="sightmap"></div>
+    </div>
+
+    <div class="card" style="padding:1rem 1.25rem;">
+      <div id="map-status" class="map-status">
+        Step 1 — Click anywhere on the map to place <strong>Point A</strong> (driver position).
+      </div>
+      <div class="spinner-row" id="map-spinner">
+        <div class="spinner"></div>
+        <span>Fetching elevation data…</span>
+      </div>
+      <div id="map-grade-manual" style="display:none; margin-top:.85rem;">
+        <div class="fg" style="max-width:230px;">
+          <label>Manual Grade (+ uphill / − downhill)</label>
+          <div class="iw">
+            <input type="number" id="map-manual-grade" value="0" min="-15" max="15" step="0.1">
+            <span class="ul">%</span>
+          </div>
+        </div>
+        <p class="hint">Elevation fetch failed — enter grade manually, then click Recalculate.</p>
+      </div>
+      <div style="margin-top:.75rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+        <button class="btn" style="margin-top:0;" onclick="recalcMap()" id="map-recalc-btn" disabled>Recalculate</button>
+        <button class="btn ghost" style="margin-top:0; margin-left:0;" onclick="resetMap()">Reset Pins</button>
+      </div>
+    </div>
+
+    <div class="card" id="map-out" style="display:none">
+      <div class="card-title">Results</div>
+      <div class="rg">
+        <div class="ri">
+          <div class="ri-label">Elevation A</div>
+          <div><span class="ri-value" id="map-elev-a">—</span><span class="ri-unit">m</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Elevation B</div>
+          <div><span class="ri-value" id="map-elev-b">—</span><span class="ri-unit">m</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Segment Length</div>
+          <div><span class="ri-value" id="map-dist">—</span><span class="ri-unit" id="map-dist-u">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Computed Grade</div>
+          <div><span class="ri-value" id="map-grade">—</span><span class="ri-unit">%</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Reaction Dist.</div>
+          <div><span class="ri-value" id="map-dr">—</span><span class="ri-unit" id="map-u1">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">Braking Dist.</div>
+          <div><span class="ri-value" id="map-db">—</span><span class="ri-unit" id="map-u2">ft</span></div>
+        </div>
+        <div class="ri hero">
+          <div class="ri-label">SSD</div>
+          <div><span class="ri-value" id="map-ssd">—</span><span class="ri-unit" id="map-u3">ft</span></div>
+        </div>
+        <div class="ri">
+          <div class="ri-label">AASHTO Min.</div>
+          <div><span class="ri-value" id="map-min">—</span><span class="ri-unit" id="map-u4">ft</span></div>
+        </div>
+      </div>
+      <div class="cmp" id="map-cmp"><span class="cmp-icon"></span><span id="map-cmp-txt"></span></div>
+      <div class="fbox" id="map-formula"></div>
+    </div>
+
+  </div><!-- /map -->
+
+</div><!-- /wrap -->
+
+<script>
+// ══════════════════════════════════════════════════════
+//  AASHTO DATA
+// ══════════════════════════════════════════════════════
+
+// SSD minimums  (source: AASHTO Green Book Table 3-1)
+const SSD_MIN_US = {20:115, 25:155, 30:200, 35:250, 40:305, 45:360,
+                    50:425, 55:495, 60:570, 65:645, 70:730, 75:820, 80:910};
+const SSD_MIN_SI = {30:35, 40:50, 50:65, 60:85, 70:105,
+                    80:130, 90:160, 100:185, 110:220, 120:250, 130:285};
+
+// PSD component parameters — AASHTO Green Book Table 3-4 (US)
+// { v, m, t1, a, t2, d3 }
+const PSD_PARAMS = [
+  {v:20, m:10, t1:3.6, a:1.40, t2:9.3,  d3:100},
+  {v:25, m:10, t1:3.6, a:1.43, t2:10.0, d3:100},
+  {v:30, m:10, t1:4.0, a:1.47, t2:10.7, d3:200},
+  {v:35, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:40, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:45, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:50, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:55, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:60, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:65, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+  {v:70, m:10, t1:4.0, a:1.50, t2:11.3, d3:200},
+];
+
+// PSD minimums (source: AASHTO Green Book)
+const PSD_MIN_US = {20:800, 25:900, 30:1100, 35:1300, 40:1500,
+                    45:1800, 50:1800, 55:2100, 60:2100, 65:2300, 70:2500};
+const PSD_MIN_SI = {30:217, 40:285, 50:345, 60:407, 70:482,
+                    80:535, 90:590, 100:670, 110:728, 120:792};
+
+// DSD values (source: AASHTO Green Book Table 3-3)
+const DSD_US = [
+  {v:30,  A:220,  B:330,  C:490,  D:535,  E:580},
+  {v:35,  A:275,  B:410,  C:590,  D:645,  E:700},
+  {v:40,  A:330,  B:495,  C:690,  D:750,  E:820},
+  {v:45,  A:395,  B:585,  C:800,  D:865,  E:930},
+  {v:50,  A:465,  B:690,  C:910,  D:985,  E:1050},
+  {v:55,  A:535,  B:800,  C:1030, D:1105, E:1180},
+  {v:60,  A:610,  B:910,  C:1150, D:1220, E:1310},
+  {v:65,  A:695,  B:1030, C:1275, D:1365, E:1445},
+  {v:70,  A:780,  B:1150, C:1410, D:1510, E:1580},
+  {v:75,  A:875,  B:1285, C:1545, D:1650, E:1720},
+  {v:80,  A:970,  B:1420, C:1685, D:1795, E:1855},
+];
+
+const DSD_SI = [
+  {v:50,  A:75,  B:115, C:155, D:170, E:185},
+  {v:60,  A:100, B:150, C:195, D:215, E:235},
+  {v:70,  A:125, B:185, C:240, D:265, E:285},
+  {v:80,  A:155, B:225, C:285, D:315, E:340},
+  {v:90,  A:185, B:275, C:340, D:370, E:400},
+  {v:100, A:220, B:325, C:395, D:430, E:460},
+  {v:110, A:260, B:370, C:455, D:490, E:525},
+  {v:120, A:305, B:420, C:510, D:550, E:590},
+  {v:130, A:355, B:470, C:570, D:610, E:650},
+];
+
+const DSD_T = {A:3.0, B:9.1, C:10.2, D:12.1, E:14.0};
+
+const DSD_DESC = {
+  A: 'Stop on rural road — long approach, low visual complexity.',
+  B: 'Stop on urban road — congested environment, many competing stimuli.',
+  C: 'Speed/path/direction change on rural road — no stop required.',
+  D: 'Speed/path/direction change on suburban road — moderate complexity.',
+  E: 'Speed/path/direction change on urban road — high complexity, many stimuli.',
+};
+
+// ── ISD Case B — base critical time gaps (s)  (AASHTO Green Book) ──
+// Two-lane major road, grade ≤ 3%.  B1 = left turn, B2 = right turn, B3 = crossing.
+const ISD_TG = {
+  pc:    { B1: 7.5,  B2: 6.5,  B3: 6.5  },
+  su:    { B1: 9.5,  B2: 8.5,  B3: 8.5  },
+  combo: { B1: 11.5, B2: 10.5, B3: 10.5 },
+};
+// Per-lane time-gap increment for lanes crossed in excess of one (left turn & crossing)
+const ISD_LANE_INC = { pc: 0.5, su: 0.7, combo: 0.7 };
+const ISD_CASE_NAME = {
+  B1: 'B1 — Left turn from the minor road',
+  B2: 'B2 — Right turn from the minor road',
+  B3: 'B3 — Crossing the major road',
+};
+const ISD_VEH_NAME = { pc: 'Passenger car', su: 'Single-unit truck', combo: 'Combination truck' };
+// Case F base time gaps (source: AASHTO Green Book, Exhibit 3-55)
+const ISD_TG_F = { pc: 5.5, su: 7.5, combo: 9.5 };
+
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+let units = 'us';
+
+// ══════════════════════════════════════════════════════
+//  UNIT SWITCH
+// ══════════════════════════════════════════════════════
+function setUnits(u) {
+  units = u;
+  document.getElementById('btn-us').classList.toggle('on', u === 'us');
+  document.getElementById('btn-si').classList.toggle('on', u === 'si');
+
+  const su = u === 'us' ? 'mph' : 'km/h';
+  const du = u === 'us' ? 'ft'  : 'm';
+  const au = u === 'us' ? 'ft/s²' : 'm/s²';
+
+  // SSD inputs
+  document.getElementById('ssd-v-u').textContent = su;
+  document.getElementById('ssd-a-u').textContent = au;
+  document.getElementById('ssd-a').value = u === 'us' ? 11.2 : 3.4;
+  document.getElementById('ssd-a-note').textContent = u === 'us'
+    ? '11.2 ft/s² (0.35g)' : '3.4 m/s² (0.347g)';
+  document.getElementById('ssd-v').value = u === 'us' ? 60 : 100;
+
+  // PSD inputs
+  document.getElementById('psd-v-u').textContent = su;
+  document.getElementById('psd-m-u').textContent = su;
+  document.getElementById('psd-a-u').textContent = u === 'us' ? 'mph/s' : 'km/h/s';
+  document.getElementById('psd-d3-u').textContent = du;
+  document.getElementById('psd-v').value = u === 'us' ? 60 : 100;
+
+  // DSD inputs
+  document.getElementById('dsd-v-u').textContent = su;
+  document.getElementById('dsd-v').value = u === 'us' ? 60 : 100;
+
+  // ISD inputs — Case B
+  document.getElementById('isd-v-u').textContent = su;
+  document.getElementById('isd-v').value = u === 'us' ? 60 : 100;
+  // ISD inputs — Case A
+  document.getElementById('a-v-maj-u').textContent = su;
+  document.getElementById('a-v-min-u').textContent = su;
+  document.getElementById('a-v-maj').value = u === 'us' ? 50 : 80;
+  document.getElementById('a-v-min').value = u === 'us' ? 30 : 50;
+  // ISD inputs — Case F
+  document.getElementById('f-v-maj-u').textContent = su;
+  document.getElementById('f-v-min-u').textContent = su;
+  document.getElementById('f-v-maj').value = u === 'us' ? 50 : 80;
+  document.getElementById('f-v-min').value = u === 'us' ? 30 : 50;
+
+  // Map inputs
+  document.getElementById('map-v-u').textContent = su;
+  document.getElementById('map-a-u').textContent = au;
+  document.getElementById('map-v').value = u === 'us' ? 60 : 100;
+  document.getElementById('map-a').value = u === 'us' ? 11.2 : 3.4;
+
+  // Hide stale results
+  ['ssd-out','psd-out','dsd-out','isd-out'].forEach(id =>
+    document.getElementById(id).style.display = 'none');
+
+  autoFillPSD();
+  buildTables();
+}
+
+// ══════════════════════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════════════════════
+let mapInited = false;
+
+function showTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('panel-' + name).classList.add('on');
+  if (name === 'map' && !mapInited) { initMap(); mapInited = true; }
+}
+
+// ══════════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════════
+function nearestRow(table, v) {
+  return table.reduce((best, row) =>
+    Math.abs(row.v - v) < Math.abs(best.v - v) ? row : best);
+}
+
+function lookupMin(obj, v) {
+  if (obj[v] !== undefined) return obj[v];
+  const keys = Object.keys(obj).map(Number).sort((a,b)=>a-b);
+  const nearest = keys.reduce((b,k) => Math.abs(k-v) < Math.abs(b-v) ? k : b);
+  return Math.abs(nearest - v) <= 15 ? obj[nearest] : null;
+}
+
+function ssdCalc(v, grade, prt, decel) {
+  const G = grade / 100;
+  const g = units === 'us' ? 32.2 : 9.81;
+  const a_g = decel / g;
+  const denom = a_g + G;
+  if (denom <= 0) return null;
+  let dr, db;
+  if (units === 'us') {
+    dr = 1.47 * v * prt;
+    db = (v * v) / (30 * denom);
+  } else {
+    dr = 0.278 * v * prt;
+    db = (v * v) / (254 * denom);
+  }
+  return { dr, db, ssd: dr + db };
+}
+
+// ══════════════════════════════════════════════════════
+//  SSD
+// ══════════════════════════════════════════════════════
+function calcSSD() {
+  const v    = parseFloat(document.getElementById('ssd-v').value);
+  const g    = parseFloat(document.getElementById('ssd-g').value);
+  const prt  = parseFloat(document.getElementById('ssd-t').value);
+  const decel= parseFloat(document.getElementById('ssd-a').value);
+
+  if ([v,g,prt,decel].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const res = ssdCalc(v, g, prt, decel);
+  if (!res) { alert('Invalid grade: deceleration minus grade is ≤ 0. Try a smaller negative grade.'); return; }
+
+  const { dr, db, ssd } = res;
+  const du = units === 'us' ? 'ft' : 'm';
+  const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
+  const minVal = lookupMin(minTable, v);
+
+  document.getElementById('ssd-dr').textContent = dr.toFixed(1);
+  document.getElementById('ssd-db').textContent = db.toFixed(1);
+  document.getElementById('ssd-tot').textContent = Math.ceil(ssd);
+  document.getElementById('ssd-min').textContent = minVal !== null ? minVal : 'N/A';
+  ['ssd-u1','ssd-u2','ssd-u3','ssd-u4'].forEach(id =>
+    document.getElementById(id).textContent = du);
+
+  const G = g / 100;
+  const a_g = decel / (units === 'us' ? 32.2 : 9.81);
+  const sign = G >= 0 ? '+' : '';
+
+  const cmp = document.getElementById('ssd-cmp');
+  if (minVal !== null) {
+    const pass = Math.ceil(ssd) >= minVal;
+    cmp.style.display = 'flex';
+    cmp.className = 'cmp ' + (pass ? 'pass' : 'fail');
+    cmp.querySelector('.cmp-icon').textContent = pass ? '✓' : '✕';
+    document.getElementById('ssd-cmp-txt').textContent = pass
+      ? `Calculated SSD (${Math.ceil(ssd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
+      : `Calculated SSD (${Math.ceil(ssd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
+  } else {
+    cmp.style.display = 'none';
+  }
+
+  const K = units === 'us' ? '1.47' : '0.278';
+  const D = units === 'us' ? '30' : '254';
+  document.getElementById('ssd-formula').textContent =
+    `SSD = ${K} × V × t  +  V² / (${D} × (a/g ${sign} G))\n`+
+    `    = ${K} × ${v} × ${prt}  +  ${v}² / (${D} × (${a_g.toFixed(3)} ${sign} ${Math.abs(G).toFixed(3)}))\n`+
+    `    = ${dr.toFixed(1)} + ${db.toFixed(1)}\n`+
+    `    = ${ssd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(ssd)} ${du}`;
+
+  document.getElementById('ssd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  PSD — AUTO-FILL
+// ══════════════════════════════════════════════════════
+function autoFillPSD() {
+  const v = parseFloat(document.getElementById('psd-v').value);
+  if (isNaN(v)) return;
+
+  let p;
+  if (units === 'us') {
+    p = nearestRow(PSD_PARAMS, v);
+    document.getElementById('psd-m').value  = p.m;
+    document.getElementById('psd-t1').value = p.t1;
+    document.getElementById('psd-a').value  = p.a;
+    document.getElementById('psd-t2').value = p.t2;
+    document.getElementById('psd-d3').value = p.d3;
+  } else {
+    // Convert AASHTO US params to SI
+    const vMph = v / 1.60934;
+    p = nearestRow(PSD_PARAMS, vMph);
+    document.getElementById('psd-m').value  = (p.m  * 1.60934).toFixed(1);
+    document.getElementById('psd-t1').value = p.t1;
+    document.getElementById('psd-a').value  = (p.a  * 1.60934).toFixed(2);
+    document.getElementById('psd-t2').value = p.t2;
+    document.getElementById('psd-d3').value = Math.round(p.d3 * 0.3048 / 10) * 10;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  PSD — CALCULATE
+// ══════════════════════════════════════════════════════
+function calcPSD() {
+  const v  = parseFloat(document.getElementById('psd-v').value);
+  const m  = parseFloat(document.getElementById('psd-m').value);
+  const t1 = parseFloat(document.getElementById('psd-t1').value);
+  const a  = parseFloat(document.getElementById('psd-a').value);
+  const t2 = parseFloat(document.getElementById('psd-t2').value);
+  const d3 = parseFloat(document.getElementById('psd-d3').value);
+
+  if ([v,m,t1,a,t2,d3].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const K = units === 'us' ? 1.47 : 0.278;
+  const d1 = K * t1 * (v - m + (a * t1) / 2);
+  const d2 = K * v * t2;
+  const d4 = (2/3) * d2;
+  const psd = d1 + d2 + d3 + d4;
+
+  const du = units === 'us' ? 'ft' : 'm';
+  const minTable = units === 'us' ? PSD_MIN_US : PSD_MIN_SI;
+  const minVal = lookupMin(minTable, v);
+
+  document.getElementById('psd-d1v').textContent = d1.toFixed(1);
+  document.getElementById('psd-d2v').textContent = d2.toFixed(1);
+  document.getElementById('psd-d3v').textContent = d3.toFixed(1);
+  document.getElementById('psd-d4v').textContent = d4.toFixed(1);
+  document.getElementById('psd-tot').textContent = Math.ceil(psd);
+  document.getElementById('psd-min').textContent = minVal !== null ? minVal : 'N/A';
+  for (let i=1;i<=6;i++)
+    document.getElementById('psd-u'+i).textContent = du;
+
+  const cmp = document.getElementById('psd-cmp');
+  if (minVal !== null) {
+    const pass = Math.ceil(psd) >= minVal;
+    cmp.style.display = 'flex';
+    cmp.className = 'cmp ' + (pass ? 'pass' : 'fail');
+    cmp.querySelector('.cmp-icon').textContent = pass ? '✓' : '✕';
+    document.getElementById('psd-cmp-txt').textContent = pass
+      ? `Calculated PSD (${Math.ceil(psd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
+      : `Calculated PSD (${Math.ceil(psd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
+  } else {
+    cmp.style.display = 'none';
+  }
+
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const Ks = units === 'us' ? '1.47' : '0.278';
+  document.getElementById('psd-formula').textContent =
+    `d₁ = ${Ks} × t₁ × (V − m + a·t₁/2)\n`+
+    `   = ${Ks} × ${t1} × (${v} − ${m} + ${a}×${t1}/2)\n`+
+    `   = ${d1.toFixed(1)} ${du}\n\n`+
+    `d₂ = ${Ks} × V × t₂  =  ${Ks} × ${v} × ${t2}  =  ${d2.toFixed(1)} ${du}\n\n`+
+    `d₃ = ${d3} ${du}  (clearance gap)\n\n`+
+    `d₄ = ⅔ × d₂  =  ⅔ × ${d2.toFixed(1)}  =  ${d4.toFixed(1)} ${du}\n\n`+
+    `PSD = ${d1.toFixed(1)} + ${d2.toFixed(1)} + ${d3} + ${d4.toFixed(1)}\n`+
+    `    = ${psd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(psd)} ${du}`;
+
+  document.getElementById('psd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  DSD
+// ══════════════════════════════════════════════════════
+function calcDSD() {
+  const v    = parseFloat(document.getElementById('dsd-v').value);
+  const type = document.getElementById('dsd-type').value;
+  if (isNaN(v)) { alert('Please enter a valid speed.'); return; }
+
+  const table = units === 'us' ? DSD_US : DSD_SI;
+  const row = nearestRow(table, v);
+  const dsd = row[type];
+  const t   = DSD_T[type];
+  const du  = units === 'us' ? 'ft' : 'm';
+  const su  = units === 'us' ? 'mph' : 'km/h';
+
+  // SSD at same speed for comparison (flat grade)
+  const decel = units === 'us' ? 11.2 : 3.4;
+  const res = ssdCalc(v, 0, 2.5, decel);
+  const ssdVal = res ? Math.ceil(res.ssd) : '—';
+  const ratio = res ? (dsd / Math.ceil(res.ssd)).toFixed(2) : '—';
+
+  document.getElementById('dsd-tot').textContent = dsd;
+  document.getElementById('dsd-t').textContent = t;
+  document.getElementById('dsd-ssd').textContent = ssdVal;
+  document.getElementById('dsd-ratio').textContent = ratio;
+  document.getElementById('dsd-u1').textContent = du;
+  document.getElementById('dsd-u2').textContent = du;
+
+  document.getElementById('dsd-desc').textContent =
+    `Type ${type}: ${DSD_DESC[type]}\n\n`+
+    `Tabulated speed: ${row.v} ${su} (nearest to ${v} ${su})\n`+
+    `Reaction / maneuver time assumed: ${t} s\n`+
+    `AASHTO minimum DSD: ${dsd} ${du}\n`+
+    `SSD at ${v} ${su} (flat, AASHTO defaults): ${ssdVal} ${du}\n`+
+    `DSD / SSD ratio: ${ratio}×`;
+
+  document.getElementById('dsd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  ISD — Case B (Intersection Sight Distance)
+// ══════════════════════════════════════════════════════
+
+// Core gap-acceptance computation; returns the time-gap breakdown and ISD.
+function isdCalc(v, caseB, veh, lanesCrossed, grade) {
+  const base = ISD_TG[veh][caseB];
+
+  // Lane and grade adjustments apply to left turns (B1) and crossings (B3) only.
+  const adjustable = (caseB === 'B1' || caseB === 'B3');
+
+  const laneAdj = adjustable
+    ? Math.max(0, Math.round(lanesCrossed) - 1) * ISD_LANE_INC[veh]
+    : 0;
+
+  // Minor-road upgrade exceeding 3% → +0.2 s per percent of grade.
+  const gradeAdj = (adjustable && grade > 3)
+    ? 0.2 * grade
+    : 0;
+
+  const tg = base + laneAdj + gradeAdj;
+  const K  = units === 'us' ? 1.47 : 0.278;   // ISD = K · V · t_g
+  const isd = K * v * tg;
+
+  return { base, laneAdj, gradeAdj, tg, isd, adjustable };
+}
+
+// ── ISD case switcher ────────────────────────────────
+function showISDCase(id, btn) {
+  document.querySelectorAll('.isd-btn').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.isd-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('on');
+  document.getElementById('isd-panel-' + id).style.display = 'block';
+}
+
+// ── Case A — No Control ──────────────────────────────
+function calcISD_A() {
+  const vMaj = parseFloat(document.getElementById('a-v-maj').value);
+  const vMin = parseFloat(document.getElementById('a-v-min').value);
+  const gMaj = parseFloat(document.getElementById('a-g-maj').value);
+  const gMin = parseFloat(document.getElementById('a-g-min').value);
+  if ([vMaj, vMin, gMaj, gMin].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const decel = units === 'us' ? 11.2 : 3.4;
+  const prt   = 2.5;
+  const K     = units === 'us' ? '1.47' : '0.278';
+  const D     = units === 'us' ? '30'   : '254';
+  const du    = units === 'us' ? 'ft'   : 'm';
+  const su    = units === 'us' ? 'mph'  : 'km/h';
+  const a_g   = (decel / (units === 'us' ? 32.2 : 9.81)).toFixed(3);
+
+  const maj = ssdCalc(vMaj, gMaj, prt, decel);
+  const min = ssdCalc(vMin, gMin, prt, decel);
+  if (!maj || !min) { alert('Invalid grade: deceleration minus grade ≤ 0.'); return; }
+
+  document.getElementById('a-maj').textContent    = Math.ceil(maj.ssd);
+  document.getElementById('a-maj-dr').textContent = maj.dr.toFixed(1);
+  document.getElementById('a-maj-db').textContent = maj.db.toFixed(1);
+  document.getElementById('a-min').textContent    = Math.ceil(min.ssd);
+  document.getElementById('a-min-dr').textContent = min.dr.toFixed(1);
+  document.getElementById('a-min-db').textContent = min.db.toFixed(1);
+  for (let i = 1; i <= 6; i++)
+    document.getElementById('a-u' + i).textContent = du;
+
+  const fmtG = (g) => (g >= 0 ? '+' : '') + (g/100).toFixed(3);
+  document.getElementById('a-formula').textContent =
+    `Case A — No Traffic Control: each sight triangle leg = SSD at that road's design speed.\n\n`+
+    `Major road leg (${vMaj} ${su}, grade ${gMaj > 0 ? '+' : ''}${gMaj}%):\n`+
+    `  SSD = ${K} × ${vMaj} × ${prt}  +  ${vMaj}² / (${D} × (${a_g} ${fmtG(gMaj)}))\n`+
+    `      = ${maj.dr.toFixed(1)} + ${maj.db.toFixed(1)} = ${maj.ssd.toFixed(1)} ${du}  →  ${Math.ceil(maj.ssd)} ${du}\n\n`+
+    `Minor road leg (${vMin} ${su}, grade ${gMin > 0 ? '+' : ''}${gMin}%):\n`+
+    `  SSD = ${K} × ${vMin} × ${prt}  +  ${vMin}² / (${D} × (${a_g} ${fmtG(gMin)}))\n`+
+    `      = ${min.dr.toFixed(1)} + ${min.db.toFixed(1)} = ${min.ssd.toFixed(1)} ${du}  →  ${Math.ceil(min.ssd)} ${du}`;
+
+  document.getElementById('a-out').style.display = 'block';
+}
+
+// ── Case F — Left Turn from Major Road ──────────────
+function calcISD_F() {
+  const vMaj  = parseFloat(document.getElementById('f-v-maj').value);
+  const vMin  = parseFloat(document.getElementById('f-v-min').value);
+  const veh   = document.getElementById('f-veh').value;
+  const lanes = parseFloat(document.getElementById('f-lanes').value);
+  if ([vMaj, vMin, lanes].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const K    = units === 'us' ? 1.47  : 0.278;
+  const du   = units === 'us' ? 'ft'  : 'm';
+  const su   = units === 'us' ? 'mph' : 'km/h';
+  const decel = units === 'us' ? 11.2 : 3.4;
+
+  const base    = ISD_TG_F[veh];
+  const laneAdj = Math.max(0, Math.round(lanes) - 1) * ISD_LANE_INC[veh];
+  const tg      = base + laneAdj;
+  const isdMaj  = Math.ceil(K * vMaj * tg);
+
+  // Minor road leg = SSD at cross-street speed, flat, AASHTO defaults
+  const minRes  = ssdCalc(vMin, 0, 2.5, decel);
+  const isdMin  = minRes ? Math.ceil(minRes.ssd) : '—';
+
+  document.getElementById('f-tgbase').textContent  = base.toFixed(1);
+  document.getElementById('f-adjlane').textContent = '+' + laneAdj.toFixed(1);
+  document.getElementById('f-tg').textContent      = tg.toFixed(1);
+  document.getElementById('f-maj').textContent     = isdMaj;
+  document.getElementById('f-min').textContent     = isdMin;
+  document.getElementById('f-u1').textContent = du;
+  document.getElementById('f-u2').textContent = du;
+
+  document.getElementById('f-formula').textContent =
+    `Case F — Left Turn from Major Road   |   ${ISD_VEH_NAME[veh]}\n\n`+
+    `── Leg along major road (watching oncoming traffic) ──\n`+
+    `Base t_g = ${base.toFixed(1)} s\n`+
+    `Lane adj = max(0, ${Math.round(lanes)} − 1) × ${ISD_LANE_INC[veh]} = +${laneAdj.toFixed(1)} s\n`+
+    `Adjusted t_g = ${tg.toFixed(1)} s\n`+
+    `ISD = ${K === 1.47 ? '1.47' : '0.278'} × ${vMaj} × ${tg.toFixed(1)}\n`+
+    `    = ${(K * vMaj * tg).toFixed(1)} ${du}   →   Design value: ${isdMaj} ${du}\n\n`+
+    `── Leg along minor road (watching cross-street traffic) ──\n`+
+    `Uses SSD at cross-street speed (${vMin} ${su}, flat, AASHTO defaults):\n`+
+    `ISD = ${isdMin} ${du}`;
+
+  document.getElementById('f-out').style.display = 'block';
+}
+
+function onIsdCaseChange() {
+  const caseB = document.getElementById('isd-case').value;
+  const adjustable = (caseB === 'B1' || caseB === 'B3');
+  // Visually de-emphasise adjustment inputs that don't apply to a right turn.
+  ['isd-lanes','isd-grade'].forEach(id => {
+    const inp = document.getElementById(id);
+    inp.disabled = !adjustable;
+    inp.parentElement.style.opacity = adjustable ? '1' : '.45';
+  });
+}
+
+function calcISD() {
+  const v      = parseFloat(document.getElementById('isd-v').value);
+  const caseB  = document.getElementById('isd-case').value;
+  const veh    = document.getElementById('isd-veh').value;
+  const lanes  = parseFloat(document.getElementById('isd-lanes').value);
+  const grade  = parseFloat(document.getElementById('isd-grade').value);
+
+  if ([v, lanes, grade].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const r  = isdCalc(v, caseB, veh, lanes, grade);
+  const du = units === 'us' ? 'ft' : 'm';
+  const su = units === 'us' ? 'mph' : 'km/h';
+
+  // Departure sight-triangle leg along the minor road — distance from the
+  // major-road edge to the stopped driver's eye (AASHTO: 14.4 ft / 4.4 m).
+  const leg = units === 'us' ? 14.4 : 4.4;
+
+  const isdRounded = Math.ceil(r.isd);
+  document.getElementById('isd-tgbase').textContent   = r.base.toFixed(1);
+  document.getElementById('isd-adjlane').textContent  = '+' + r.laneAdj.toFixed(1);
+  document.getElementById('isd-adjgrade').textContent = '+' + r.gradeAdj.toFixed(1);
+  document.getElementById('isd-tg').textContent       = r.tg.toFixed(1);
+  document.getElementById('isd-tot').textContent      = isdRounded;
+  document.getElementById('isd-leg').textContent      = leg;
+  document.getElementById('isd-u1').textContent = du;
+  document.getElementById('isd-u2').textContent = du;
+
+  const K = units === 'us' ? '1.47' : '0.278';
+  const laneNote = r.adjustable
+    ? `Lane adj  = max(0, ${Math.round(lanes)} − 1) × ${ISD_LANE_INC[veh]} = +${r.laneAdj.toFixed(1)} s\n`+
+      `Grade adj = ${grade > 3 ? `0.2 × ${grade} = +${r.gradeAdj.toFixed(1)} s (upgrade > 3%)` : '0.0 s (grade ≤ 3% or downgrade)'}\n`
+    : `Lane & grade adjustments do not apply to a right turn (B2).\n`;
+
+  document.getElementById('isd-formula').textContent =
+    `${ISD_CASE_NAME[caseB]}   |   ${ISD_VEH_NAME[veh]}\n\n`+
+    `Base time gap t_g = ${r.base.toFixed(1)} s\n`+
+    laneNote +
+    `Adjusted t_g = ${r.tg.toFixed(1)} s\n\n`+
+    `ISD = ${K} × V × t_g\n`+
+    `    = ${K} × ${v} × ${r.tg.toFixed(1)}\n`+
+    `    = ${r.isd.toFixed(1)} ${du}   →   Design value: ${isdRounded} ${du}\n\n`+
+    `Minor-road leg of departure sight triangle ≈ ${leg} ${du} (driver eye set-back).`;
+
+  document.getElementById('isd-out').style.display = 'block';
+}
+
+// ══════════════════════════════════════════════════════
+//  REFERENCE TABLES
+// ══════════════════════════════════════════════════════
+function buildTables() {
+  buildSSDTable();
+  buildPSDTable();
+  buildDSDTable();
+  buildISDTable();
+}
+
+function buildSSDTable() {
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const du = units === 'us' ? 'ft'  : 'm';
+  const speeds = units === 'us'
+    ? [20,25,30,35,40,45,50,55,60,65,70,75,80]
+    : [30,40,50,60,70,80,90,100,110,120,130];
+  const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
+  const decel    = units === 'us' ? 11.2 : 3.4;
+
+  document.getElementById('ssd-th0').textContent = `Speed (${su})`;
+  document.getElementById('ssd-th1').textContent = `Reaction Dist. (${du})`;
+  document.getElementById('ssd-th2').textContent = `Braking Dist. (${du})`;
+  document.getElementById('ssd-th3').textContent = `Calc. SSD (${du})`;
+  document.getElementById('ssd-th4').textContent = `AASHTO Min. (${du})`;
+
+  const tbody = document.querySelector('#ssd-tbl tbody');
+  tbody.innerHTML = '';
+  speeds.forEach(v => {
+    const r = ssdCalc(v, 0, 2.5, decel);
+    const min = minTable[v] || '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${v}</td><td>${r.dr.toFixed(0)}</td><td>${r.db.toFixed(0)}</td>`+
+                   `<td>${Math.ceil(r.ssd)}</td><td><strong>${min}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildPSDTable() {
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const du = units === 'us' ? 'ft'  : 'm';
+  const au = units === 'us' ? 'mph/s' : 'km/h/s';
+
+  document.getElementById('psd-th0').textContent  = `Speed (${su})`;
+  document.getElementById('psd-th5').textContent  = `d₃ (${du})`;
+  document.getElementById('psd-th6').textContent  = `d₁ (${du})`;
+  document.getElementById('psd-th7').textContent  = `d₂ (${du})`;
+  document.getElementById('psd-th8').textContent  = `d₄ (${du})`;
+  document.getElementById('psd-th9').textContent  = `Calc. PSD (${du})`;
+  document.getElementById('psd-th10').textContent = `AASHTO Min. (${du})`;
+
+  const K = units === 'us' ? 1.47 : 0.278;
+  const tbody = document.querySelector('#psd-tbl tbody');
+  tbody.innerHTML = '';
+
+  PSD_PARAMS.forEach(p => {
+    let v, m, a, d3;
+    if (units === 'us') {
+      v = p.v; m = p.m; a = p.a; d3 = p.d3;
+    } else {
+      v  = (p.v * 1.60934).toFixed(0) * 1;
+      m  = (p.m * 1.60934).toFixed(1) * 1;
+      a  = (p.a * 1.60934).toFixed(2) * 1;
+      d3 = Math.round(p.d3 * 0.3048 / 10) * 10;
+    }
+    const d1  = K * p.t1 * (v - m + (a * p.t1) / 2);
+    const d2  = K * v * p.t2;
+    const d4  = (2/3) * d2;
+    const psd = d1 + d2 + d3 + d4;
+    const minTable = units === 'us' ? PSD_MIN_US : PSD_MIN_SI;
+    const minVal = minTable[units === 'us' ? p.v : v] || '—';
+
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      `<td>${v}</td><td>${m}</td><td>${p.t1}</td><td>${a}</td><td>${p.t2}</td>`+
+      `<td>${d3}</td><td>${d1.toFixed(0)}</td><td>${d2.toFixed(0)}</td>`+
+      `<td>${d4.toFixed(0)}</td><td>${Math.ceil(psd)}</td>`+
+      `<td><strong>${minVal}</strong></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildDSDTable() {
+  const su = units === 'us' ? 'mph' : 'km/h';
+  const du = units === 'us' ? 'ft'  : 'm';
+  document.getElementById('dsd-th0').textContent = `Speed (${su}) / DSD (${du})`;
+
+  const table = units === 'us' ? DSD_US : DSD_SI;
+  const tbody = document.querySelector('#dsd-tbl tbody');
+  tbody.innerHTML = '';
+  table.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.v}</td><td>${row.A}</td><td>${row.B}</td>`+
+                   `<td>${row.C}</td><td>${row.D}</td><td>${row.E}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function buildISDTable() {
+  const su    = units === 'us' ? 'mph' : 'km/h';
+  const du    = units === 'us' ? 'ft'  : 'm';
+  const K     = units === 'us' ? 1.47  : 0.278;
+  const decel = units === 'us' ? 11.2  : 3.4;
+  const speeds = units === 'us'
+    ? [15,20,25,30,35,40,45,50,55,60,65,70,75,80]
+    : [20,30,40,50,60,70,80,90,100,110,120,130];
+
+  document.getElementById('isd-th0').textContent  = `Speed (${su})`;
+  document.getElementById('isd-th-a').innerHTML   = `Case A SSD (${du})`;
+  document.getElementById('isd-th1').innerHTML    = `B1 Left t<sub>g</sub>=7.5 s (${du})`;
+  document.getElementById('isd-th2').innerHTML    = `B2/B3 t<sub>g</sub>=6.5 s (${du})`;
+  document.getElementById('isd-th-f').innerHTML   = `Case F Major t<sub>g</sub>=5.5 s (${du})`;
+
+  const tbody = document.querySelector('#isd-tbl tbody');
+  tbody.innerHTML = '';
+  speeds.forEach(v => {
+    const ssdRes = ssdCalc(v, 0, 2.5, decel);
+    const caseA  = ssdRes ? Math.ceil(ssdRes.ssd) : '—';
+    const b1     = Math.ceil(K * v * 7.5);
+    const b23    = Math.ceil(K * v * 6.5);
+    const caseF  = Math.ceil(K * v * 5.5);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${v}</td><td>${caseA}</td><td><strong>${b1}</strong></td>`+
+                   `<td>${b23}</td><td>${caseF}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  MAP / GRADE TOOL
+// ══════════════════════════════════════════════════════
+let _map = null;
+let _pins = [];
+let _overlays = [];
+let _lastCalcInputs = null;
+
+function initMap() {
+  _map = L.map('sightmap').setView([39.5, -98.35], 4);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19
+  }).addTo(_map);
+  _map.on('click', onMapClick);
+}
+
+function onMapClick(e) {
+  const { lat, lng } = e.latlng;
+  if (_pins.length >= 2) { resetMap(); }
+
+  const label = _pins.length === 0 ? 'A' : 'B';
+  const color  = label === 'A' ? '#1a4b8c' : '#ea580c';
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:28px;height:28px;background:${color};border:2.5px solid #fff;
+           border-radius:50%;display:flex;align-items:center;justify-content:center;
+           color:#fff;font-weight:800;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.35)">
+           ${label}</div>`,
+    iconSize: [28, 28], iconAnchor: [14, 14]
+  });
+
+  _pins.push({ lat, lng, marker: L.marker([lat, lng], { icon }).addTo(_map) });
+
+  if (_pins.length === 1) {
+    setMapStatus('Step 2 — Click a second point along the road to define direction and grade.');
+  } else {
+    runMapCalc();
+  }
+}
+
+async function runMapCalc() {
+  const [A, B] = _pins;
+  document.getElementById('map-grade-manual').style.display = 'none';
+  document.getElementById('map-spinner').style.display = 'flex';
+  document.getElementById('map-out').style.display = 'none';
+  document.getElementById('map-recalc-btn').disabled = true;
+  setMapStatus('Trying elevation APIs…');
+
+  const distM = haversineM(A.lat, A.lng, B.lat, B.lng);
+  const elevs = await fetchElevations(A.lat, A.lng, B.lat, B.lng);
+  document.getElementById('map-spinner').style.display = 'none';
+
+  if (elevs) {
+    const gradePct = ((elevs.elevB - elevs.elevA) / distM) * 100;
+    _lastCalcInputs = { A, B, distM, gradePct, elevA: elevs.elevA, elevB: elevs.elevB, src: elevs.src };
+    renderMapResults();
+  } else {
+    setMapStatus('All elevation APIs unreachable — enter the road grade manually below.', 'err');
+    document.getElementById('map-grade-manual').style.display = 'block';
+    _lastCalcInputs = { A, B, distM, gradePct: null, elevA: null, elevB: null, src: null };
+    document.getElementById('map-recalc-btn').disabled = false;
+  }
+}
+
+// Try three public elevation APIs in sequence; return first that works.
+async function fetchElevations(lat1, lng1, lat2, lng2) {
+  // 1 — Open-Topo-Data (global SRTM 90 m)
+  try {
+    const r = await withTimeout(
+      fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat1},${lng1}|${lat2},${lng2}`), 7000);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.status === 'OK' && d.results[0].elevation !== null && d.results[1].elevation !== null)
+        return { elevA: d.results[0].elevation, elevB: d.results[1].elevation, src: 'Open-Topo-Data SRTM' };
+    }
+  } catch (_) {}
+
+  // 2 — Open-Elevation
+  try {
+    const r = await withTimeout(fetch('https://api.open-elevation.com/api/v1/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locations: [
+        { latitude: lat1, longitude: lng1 },
+        { latitude: lat2, longitude: lng2 }
+      ]})
+    }), 7000);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.results?.length >= 2)
+        return { elevA: d.results[0].elevation, elevB: d.results[1].elevation, src: 'Open-Elevation' };
+    }
+  } catch (_) {}
+
+  // 3 — USGS EPQS (US locations)
+  try {
+    const [r1, r2] = await Promise.all([
+      withTimeout(fetch(`https://epqs.nationalmap.gov/v1/json?x=${lng1}&y=${lat1}&units=Meters&includeDate=false`), 7000),
+      withTimeout(fetch(`https://epqs.nationalmap.gov/v1/json?x=${lng2}&y=${lat2}&units=Meters&includeDate=false`), 7000)
+    ]);
+    if (r1.ok && r2.ok) {
+      const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+      const e1 = parseFloat(d1.value ?? d1.elevation);
+      const e2 = parseFloat(d2.value ?? d2.elevation);
+      if (!isNaN(e1) && !isNaN(e2))
+        return { elevA: e1, elevB: e2, src: 'USGS EPQS' };
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+}
+
+function renderMapResults() {
+  const { A, B, distM, elevA, elevB, src } = _lastCalcInputs;
+  let { gradePct } = _lastCalcInputs;
+
+  // Use manual grade when elevation fetch failed
+  if (gradePct === null) {
+    gradePct = parseFloat(document.getElementById('map-manual-grade').value) || 0;
+  }
+
+  const speed = parseFloat(document.getElementById('map-v').value) || 60;
+  const prt   = parseFloat(document.getElementById('map-t').value) || 2.5;
+  const decel = parseFloat(document.getElementById('map-a').value) || 11.2;
+  const du    = units === 'us' ? 'ft' : 'm';
+  const su    = units === 'us' ? 'mph' : 'km/h';
+
+  const res = ssdCalc(speed, gradePct, prt, decel);
+  if (!res) { setMapStatus('Grade exceeds deceleration capacity — SSD undefined.', 'err'); return; }
+
+  const { dr, db, ssd } = res;
+  const ssdM        = units === 'us' ? ssd * 0.3048 : ssd;
+  const distDisplay = units === 'us' ? distM * 3.28084 : distM;
+  const gradeSign   = gradePct >= 0 ? '+' : '';
+
+  // Redraw overlays
+  _overlays.forEach(o => _map.removeLayer(o));
+  _overlays = [];
+
+  _overlays.push(L.polyline([[A.lat, A.lng], [B.lat, B.lng]], {
+    color: '#1a4b8c', weight: 2.5, dashArray: '6 4', opacity: .8
+  }).addTo(_map));
+
+  _overlays.push(L.circle([A.lat, A.lng], {
+    radius: ssdM, color: '#ea580c', fillColor: '#ea580c',
+    fillOpacity: .08, weight: 2, dashArray: '8 5'
+  }).addTo(_map));
+
+  const bearing = bearingRad(A.lat, A.lng, B.lat, B.lng);
+  const ep = destPoint(A.lat, A.lng, ssdM, bearing);
+  _overlays.push(L.marker([ep.lat, ep.lng], { icon: L.divIcon({
+    className: '',
+    html: `<div style="background:#ea580c;color:#fff;padding:2px 7px;border-radius:4px;
+           font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)">
+           SSD: ${Math.ceil(ssd)} ${du}</div>`,
+    iconAnchor: [0, 8]
+  })}).addTo(_map));
+
+  _map.fitBounds(L.latLngBounds([[A.lat,A.lng],[B.lat,B.lng],[ep.lat,ep.lng]]).pad(0.25));
+
+  // Result card
+  const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
+  const minVal   = lookupMin(minTable, speed);
+
+  document.getElementById('map-elev-a').textContent = elevA !== null ? elevA.toFixed(1) : '—';
+  document.getElementById('map-elev-b').textContent = elevB !== null ? elevB.toFixed(1) : '—';
+  document.getElementById('map-dist').textContent   = distDisplay.toFixed(0);
+  document.getElementById('map-grade').textContent  = gradeSign + gradePct.toFixed(2);
+  document.getElementById('map-dr').textContent     = dr.toFixed(1);
+  document.getElementById('map-db').textContent     = db.toFixed(1);
+  document.getElementById('map-ssd').textContent    = Math.ceil(ssd);
+  document.getElementById('map-min').textContent    = minVal !== null ? minVal : 'N/A';
+  ['map-dist-u','map-u1','map-u2','map-u3','map-u4'].forEach(id =>
+    document.getElementById(id).textContent = du);
+
+  const cmp = document.getElementById('map-cmp');
+  if (minVal !== null) {
+    const pass = Math.ceil(ssd) >= minVal;
+    cmp.style.display = 'flex';
+    cmp.className = 'cmp ' + (pass ? 'pass' : 'fail');
+    cmp.querySelector('.cmp-icon').textContent = pass ? '✓' : '✕';
+    document.getElementById('map-cmp-txt').textContent = pass
+      ? `SSD (${Math.ceil(ssd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
+      : `SSD (${Math.ceil(ssd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
+  } else { cmp.style.display = 'none'; }
+
+  const K   = units === 'us' ? '1.47' : '0.278';
+  const D   = units === 'us' ? '30'   : '254';
+  const G   = Math.abs(gradePct / 100).toFixed(4);
+  const a_g = (decel / (units === 'us' ? 32.2 : 9.81)).toFixed(4);
+  const elevLine = elevA !== null
+    ? `Elevation A = ${elevA.toFixed(2)} m  |  Elevation B = ${elevB.toFixed(2)} m  [${src}]\n`+
+      `Horizontal distance = ${distM.toFixed(1)} m\n`+
+      `Grade = (${elevB.toFixed(2)} − ${elevA.toFixed(2)}) / ${distM.toFixed(1)} = ${gradeSign}${gradePct.toFixed(3)} %\n\n`
+    : `Grade entered manually: ${gradeSign}${gradePct.toFixed(2)} %\n\n`;
+  document.getElementById('map-formula').textContent =
+    elevLine +
+    `SSD = ${K} × V × t  +  V² / (${D} × (a/g ${gradeSign} G))\n`+
+    `    = ${K} × ${speed} × ${prt}  +  ${speed}² / (${D} × (${a_g} ${gradeSign} ${G}))\n`+
+    `    = ${dr.toFixed(1)} + ${db.toFixed(1)}\n`+
+    `    = ${ssd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(ssd)} ${du}`;
+
+  document.getElementById('map-out').style.display = 'block';
+  document.getElementById('map-recalc-btn').disabled = false;
+  setMapStatus(
+    `Grade: ${gradeSign}${gradePct.toFixed(2)}%  |  SSD: ${Math.ceil(ssd)} ${du} at ${speed} ${su}  —  Click map to reset.`,
+    'ready'
+  );
+}
+
+function recalcMap() {
+  if (_pins.length < 2 || !_lastCalcInputs) return;
+  renderMapResults();
+}
+
+function resetMap() {
+  _pins.forEach(p => _map.removeLayer(p.marker));
+  _overlays.forEach(o => _map.removeLayer(o));
+  _pins = []; _overlays = []; _lastCalcInputs = null;
+  document.getElementById('map-out').style.display = 'none';
+  document.getElementById('map-spinner').style.display = 'none';
+  document.getElementById('map-grade-manual').style.display = 'none';
+  document.getElementById('map-recalc-btn').disabled = true;
+  setMapStatus('Step 1 — Click anywhere on the map to place <strong>Point A</strong> (driver position).');
+}
+
+function setMapStatus(msg, cls = '') {
+  const el = document.getElementById('map-status');
+  el.innerHTML = msg;
+  el.className = 'map-status' + (cls ? ' ' + cls : '');
+}
+
+// ── Geo helpers ──────────────────────────────────────
+function haversineM(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2 - lat1) * Math.PI/180, Δλ = (lng2 - lng1) * Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function bearingRad(lat1, lng1, lat2, lng2) {
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180, Δλ = (lng2-lng1)*Math.PI/180;
+  return Math.atan2(Math.sin(Δλ)*Math.cos(φ2),
+    Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ));
+}
+
+function destPoint(lat, lng, distM, bearingR) {
+  const R = 6371000, φ = lat*Math.PI/180, λ = lng*Math.PI/180;
+  const φ2 = Math.asin(Math.sin(φ)*Math.cos(distM/R) + Math.cos(φ)*Math.sin(distM/R)*Math.cos(bearingR));
+  const λ2 = λ + Math.atan2(Math.sin(bearingR)*Math.sin(distM/R)*Math.cos(φ),
+               Math.cos(distM/R) - Math.sin(φ)*Math.sin(φ2));
+  return { lat: φ2*180/Math.PI, lng: λ2*180/Math.PI };
+}
+
+// ══════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  buildTables();
+  autoFillPSD();
+  onIsdCaseChange();
+});
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</body>
+</html>
