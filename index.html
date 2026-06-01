@@ -365,6 +365,45 @@
       flex-shrink: 0;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── ISD case selector ─────────────────────────── */
+    .isd-sel {
+      display: flex;
+      border: 1.5px solid var(--border);
+      border-radius: .5rem;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .isd-btn {
+      flex: 1;
+      padding: .65rem 1rem;
+      border: none;
+      border-right: 1px solid var(--border);
+      background: var(--card);
+      cursor: pointer;
+      font-size: .875rem;
+      font-weight: 600;
+      color: var(--muted);
+      transition: background .15s, color .15s;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .isd-btn:last-child { border-right: none; }
+    .isd-btn:hover { color: var(--blue); background: #eff6ff; }
+    .isd-btn.on { background: var(--blue); color: #fff; }
+    .isd-case-desc {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--orange);
+      border-radius: .45rem;
+      padding: .75rem 1rem;
+      font-size: .8125rem;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+      line-height: 1.6;
+    }
+    .isd-case-desc strong { color: var(--orange); display: block; margin-bottom: .2rem; }
   </style>
 </head>
 <body>
@@ -630,121 +669,221 @@
     </div>
   </div>
 
-  <!-- ═══════════════ ISD (Case B) ═══════════════ -->
+  <!-- ═══════════════ ISD ═══════════════ -->
   <div id="panel-isd" class="panel">
 
     <div class="info">
-      <strong>Intersection Sight Distance (ISD) — AASHTO Case B (Stop Control on Minor Road)</strong>
-      The length of major-road leg of the departure sight triangle that a driver stopped on the minor road must be able to see, so a gap in major-road traffic is long enough to complete the maneuver. Computed by the gap-acceptance method: <em>ISD = 1.47 × V<sub>major</sub> × t<sub>g</sub></em> (US) — where t<sub>g</sub> is the critical time gap. Case B has three sub-cases: <strong>B1</strong> left turn, <strong>B2</strong> right turn, <strong>B3</strong> crossing.
+      <strong>Intersection Sight Distance (ISD) — AASHTO Green Book</strong>
+      Select a control case. ISD defines the required sight triangle leg(s) so drivers have adequate time to see and react to conflicting traffic at an intersection.
     </div>
 
-    <div class="card">
-      <div class="card-title">Input Parameters</div>
-      <div class="grid">
-        <div class="fg">
-          <label>Major Road Design Speed</label>
-          <div class="iw">
-            <input type="number" id="isd-v" value="60" min="15" max="130" step="5">
-            <span class="ul" id="isd-v-u">mph</span>
-          </div>
-        </div>
-        <div class="fg">
-          <label>Case B Maneuver</label>
-          <div class="iw">
-            <select id="isd-case" onchange="onIsdCaseChange()">
-              <option value="B1" selected>B1 — Left Turn from Minor Road</option>
-              <option value="B2">B2 — Right Turn from Minor Road</option>
-              <option value="B3">B3 — Crossing Maneuver</option>
-            </select>
-          </div>
-        </div>
-        <div class="fg">
-          <label>Design Vehicle</label>
-          <div class="iw">
-            <select id="isd-veh">
-              <option value="pc" selected>Passenger Car</option>
-              <option value="su">Single-Unit Truck</option>
-              <option value="combo">Combination Truck</option>
-            </select>
-          </div>
-        </div>
+    <div class="isd-sel">
+      <button class="isd-btn"    onclick="showISDCase('A',this)">Case A — No Control</button>
+      <button class="isd-btn on" onclick="showISDCase('B',this)">Case B — Stop Control</button>
+      <button class="isd-btn"    onclick="showISDCase('F',this)">Case F — Major-Road Left Turn</button>
+    </div>
+
+    <!-- ══ Case A ══ -->
+    <div id="isd-panel-A" class="isd-panel" style="display:none">
+      <div class="isd-case-desc">
+        <strong>Case A — No Traffic Control (Equal Priority)</strong>
+        Both roads have equal right-of-way. Each approach leg of the sight triangle must be at least equal to the SSD at that road's design speed. Uses the standard SSD formula with AASHTO defaults (PRT = 2.5 s, a = 11.2 ft/s²).
       </div>
-
-      <div class="divider">Adjustments</div>
-
-      <div class="grid">
-        <div class="fg">
-          <label>Lanes Crossed by Vehicle</label>
-          <div class="iw">
-            <input type="number" id="isd-lanes" value="1" min="1" max="8" step="1">
-            <span class="ul">lanes</span>
+      <div class="card">
+        <div class="card-title">Input Parameters</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Major Road Design Speed</label>
+            <div class="iw"><input type="number" id="a-v-maj" value="50" min="15" max="130" step="5"><span class="ul" id="a-v-maj-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Minor Road Design Speed</label>
+            <div class="iw"><input type="number" id="a-v-min" value="30" min="15" max="130" step="5"><span class="ul" id="a-v-min-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Major Road Grade (+ up / − down)</label>
+            <div class="iw"><input type="number" id="a-g-maj" value="0" min="-15" max="15" step="0.5"><span class="ul">%</span></div>
+          </div>
+          <div class="fg">
+            <label>Minor Road Grade (+ up / − down)</label>
+            <div class="iw"><input type="number" id="a-g-min" value="0" min="-15" max="15" step="0.5"><span class="ul">%</span></div>
           </div>
         </div>
-        <div class="fg">
-          <label>Minor-Road Approach Grade</label>
-          <div class="iw">
-            <input type="number" id="isd-grade" value="0" min="-10" max="15" step="0.5">
-            <span class="ul">%</span>
+        <button class="btn" onclick="calcISD_A()">Calculate Case A ISD</button>
+      </div>
+      <div class="card" id="a-out" style="display:none">
+        <div class="card-title">Results</div>
+        <div class="rg">
+          <div class="ri hero">
+            <div class="ri-label">Major Road Leg</div>
+            <div><span class="ri-value" id="a-maj">—</span><span class="ri-unit" id="a-u1">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Reaction Dist. (Major)</div>
+            <div><span class="ri-value" id="a-maj-dr">—</span><span class="ri-unit" id="a-u2">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Braking Dist. (Major)</div>
+            <div><span class="ri-value" id="a-maj-db">—</span><span class="ri-unit" id="a-u3">ft</span></div>
+          </div>
+          <div class="ri hero">
+            <div class="ri-label">Minor Road Leg</div>
+            <div><span class="ri-value" id="a-min">—</span><span class="ri-unit" id="a-u4">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Reaction Dist. (Minor)</div>
+            <div><span class="ri-value" id="a-min-dr">—</span><span class="ri-unit" id="a-u5">ft</span></div>
+          </div>
+          <div class="ri">
+            <div class="ri-label">Braking Dist. (Minor)</div>
+            <div><span class="ri-value" id="a-min-db">—</span><span class="ri-unit" id="a-u6">ft</span></div>
           </div>
         </div>
+        <div class="fbox" id="a-formula"></div>
       </div>
-
-      <p class="hint" id="isd-adj-note">
-        <strong>Lane adjustment</strong> (left turn &amp; crossing): +0.5 s per passenger car / +0.7 s per truck for each lane <em>in excess of one</em> the vehicle crosses.
-        <strong>Grade adjustment:</strong> if the minor-road approach is an upgrade &gt; 3%, add 0.2 s per percent of grade (left turn &amp; crossing only). Right turns (B2) take no lane or grade adjustment.
-      </p>
-
-      <button class="btn" onclick="calcISD()">Calculate ISD</button>
     </div>
 
-    <div class="card" id="isd-out" style="display:none">
-      <div class="card-title">Results</div>
-      <div class="rg">
-        <div class="ri">
-          <div class="ri-label">Base Time Gap</div>
-          <div><span class="ri-value" id="isd-tgbase">—</span><span class="ri-unit">s</span></div>
-        </div>
-        <div class="ri">
-          <div class="ri-label">Lane Adjustment</div>
-          <div><span class="ri-value" id="isd-adjlane">—</span><span class="ri-unit">s</span></div>
-        </div>
-        <div class="ri">
-          <div class="ri-label">Grade Adjustment</div>
-          <div><span class="ri-value" id="isd-adjgrade">—</span><span class="ri-unit">s</span></div>
-        </div>
-        <div class="ri">
-          <div class="ri-label">Adjusted Time Gap</div>
-          <div><span class="ri-value" id="isd-tg">—</span><span class="ri-unit">s</span></div>
-        </div>
-        <div class="ri hero">
-          <div class="ri-label">Intersection Sight Distance</div>
-          <div><span class="ri-value" id="isd-tot">—</span><span class="ri-unit" id="isd-u1">ft</span></div>
-        </div>
-        <div class="ri">
-          <div class="ri-label">Leg Along Minor Road</div>
-          <div><span class="ri-value" id="isd-leg">—</span><span class="ri-unit" id="isd-u2">ft</span></div>
-        </div>
+    <!-- ══ Case B ══ -->
+    <div id="isd-panel-B" class="isd-panel">
+      <div class="isd-case-desc">
+        <strong>Case B — Stop Control on the Minor Road (Departure Sight Triangle)</strong>
+        A driver who has stopped on the minor road must be able to see far enough along the major road that the available gap is long enough to complete the maneuver. Sub-cases: <strong>B1</strong> left turn, <strong>B2</strong> right turn, <strong>B3</strong> crossing. ISD = 1.47 × V × t<sub>g</sub> (US) or 0.278 × V × t<sub>g</sub> (SI).
       </div>
-      <div class="fbox" id="isd-formula"></div>
+      <div class="card">
+        <div class="card-title">Input Parameters</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Major Road Design Speed</label>
+            <div class="iw"><input type="number" id="isd-v" value="60" min="15" max="130" step="5"><span class="ul" id="isd-v-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Case B Maneuver</label>
+            <div class="iw">
+              <select id="isd-case" onchange="onIsdCaseChange()">
+                <option value="B1" selected>B1 — Left Turn from Minor Road</option>
+                <option value="B2">B2 — Right Turn from Minor Road</option>
+                <option value="B3">B3 — Crossing Maneuver</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label>Design Vehicle</label>
+            <div class="iw">
+              <select id="isd-veh">
+                <option value="pc" selected>Passenger Car</option>
+                <option value="su">Single-Unit Truck</option>
+                <option value="combo">Combination Truck</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="divider">Adjustments</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Lanes Crossed by Vehicle</label>
+            <div class="iw"><input type="number" id="isd-lanes" value="1" min="1" max="8" step="1"><span class="ul">lanes</span></div>
+          </div>
+          <div class="fg">
+            <label>Minor-Road Approach Grade</label>
+            <div class="iw"><input type="number" id="isd-grade" value="0" min="-10" max="15" step="0.5"><span class="ul">%</span></div>
+          </div>
+        </div>
+        <p class="hint">
+          <strong>Lane adj.</strong> (B1 &amp; B3): +0.5 s/lane (PC) or +0.7 s/lane (truck) for each lane beyond one.
+          <strong>Grade adj.</strong> (B1 &amp; B3): +0.2 s per % of upgrade exceeding 3%. B2 right turns take no adjustments.
+        </p>
+        <button class="btn" onclick="calcISD()">Calculate Case B ISD</button>
+      </div>
+      <div class="card" id="isd-out" style="display:none">
+        <div class="card-title">Results</div>
+        <div class="rg">
+          <div class="ri"><div class="ri-label">Base Time Gap</div><div><span class="ri-value" id="isd-tgbase">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Lane Adjustment</div><div><span class="ri-value" id="isd-adjlane">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Grade Adjustment</div><div><span class="ri-value" id="isd-adjgrade">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Adjusted t<sub>g</sub></div><div><span class="ri-value" id="isd-tg">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri hero"><div class="ri-label">ISD — Major Road Leg</div><div><span class="ri-value" id="isd-tot">—</span><span class="ri-unit" id="isd-u1">ft</span></div></div>
+          <div class="ri"><div class="ri-label">Minor Road Set-Back</div><div><span class="ri-value" id="isd-leg">—</span><span class="ri-unit" id="isd-u2">ft</span></div></div>
+        </div>
+        <div class="fbox" id="isd-formula"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Case B Base Critical Time Gaps (t<sub>g</sub>)</div>
+        <div class="tw"><table>
+          <thead><tr><th>Design Vehicle</th><th>B1 Left Turn</th><th>B2 Right Turn</th><th>B3 Crossing</th></tr></thead>
+          <tbody>
+            <tr><td>Passenger Car</td><td>7.5 s</td><td>6.5 s</td><td>6.5 s</td></tr>
+            <tr><td>Single-Unit Truck</td><td>9.5 s</td><td>8.5 s</td><td>8.5 s</td></tr>
+            <tr><td>Combination Truck</td><td>11.5 s</td><td>10.5 s</td><td>10.5 s</td></tr>
+          </tbody>
+        </table></div>
+        <p class="hint">Assumes two-lane major road, grade ≤ 3%. Source: AASHTO Green Book, Exhibit 3-54.</p>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">AASHTO Case B Critical Time Gaps (t<sub>g</sub>, base)</div>
-      <div class="tw"><table>
-        <thead><tr>
-          <th>Design Vehicle</th>
-          <th>B1 — Left Turn</th>
-          <th>B2 — Right Turn</th>
-          <th>B3 — Crossing</th>
-        </tr></thead>
-        <tbody>
-          <tr><td>Passenger Car</td><td>7.5 s</td><td>6.5 s</td><td>6.5 s</td></tr>
-          <tr><td>Single-Unit Truck</td><td>9.5 s</td><td>8.5 s</td><td>8.5 s</td></tr>
-          <tr><td>Combination Truck</td><td>11.5 s</td><td>10.5 s</td><td>10.5 s</td></tr>
-        </tbody>
-      </table></div>
-      <p class="hint">Base values assume a two-lane major road with grade ≤ 3%. Source: AASHTO Green Book, Case B departure sight triangles.</p>
+    <!-- ══ Case F ══ -->
+    <div id="isd-panel-F" class="isd-panel" style="display:none">
+      <div class="isd-case-desc">
+        <strong>Case F — Left Turn from the Major Road (Departure Sight Triangle)</strong>
+        A driver on the major road waiting to turn left must see far enough along the major road (opposing traffic) to complete the turn safely, and far enough along the minor road (cross-street traffic) to avoid a collision. Two sight triangle legs are required.
+      </div>
+      <div class="card">
+        <div class="card-title">Input Parameters</div>
+        <div class="grid">
+          <div class="fg">
+            <label>Major Road Speed (opposing)</label>
+            <div class="iw"><input type="number" id="f-v-maj" value="50" min="15" max="130" step="5"><span class="ul" id="f-v-maj-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Cross-Street (Minor Road) Speed</label>
+            <div class="iw"><input type="number" id="f-v-min" value="30" min="15" max="130" step="5"><span class="ul" id="f-v-min-u">mph</span></div>
+          </div>
+          <div class="fg">
+            <label>Design Vehicle</label>
+            <div class="iw">
+              <select id="f-veh">
+                <option value="pc" selected>Passenger Car</option>
+                <option value="su">Single-Unit Truck</option>
+                <option value="combo">Combination Truck</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg">
+            <label>Opposing Lanes Crossed</label>
+            <div class="iw"><input type="number" id="f-lanes" value="1" min="1" max="6" step="1"><span class="ul">lanes</span></div>
+          </div>
+        </div>
+        <p class="hint">
+          Base t<sub>g</sub> for Case F (PC = 5.5 s, SU = 7.5 s, Combo = 9.5 s).
+          Lane adjustment: +0.5 s (PC) / +0.7 s (truck) per opposing lane beyond one.
+          Minor road leg = SSD at cross-street speed (flat, AASHTO defaults).
+        </p>
+        <button class="btn" onclick="calcISD_F()">Calculate Case F ISD</button>
+      </div>
+      <div class="card" id="f-out" style="display:none">
+        <div class="card-title">Results</div>
+        <div class="rg">
+          <div class="ri"><div class="ri-label">Base Time Gap</div><div><span class="ri-value" id="f-tgbase">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Lane Adjustment</div><div><span class="ri-value" id="f-adjlane">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri"><div class="ri-label">Adjusted t<sub>g</sub></div><div><span class="ri-value" id="f-tg">—</span><span class="ri-unit">s</span></div></div>
+          <div class="ri hero"><div class="ri-label">Leg Along Major Road</div><div><span class="ri-value" id="f-maj">—</span><span class="ri-unit" id="f-u1">ft</span></div></div>
+          <div class="ri hero"><div class="ri-label">Leg Along Minor Road</div><div><span class="ri-value" id="f-min">—</span><span class="ri-unit" id="f-u2">ft</span></div></div>
+        </div>
+        <div class="fbox" id="f-formula"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Case F Base Critical Time Gaps (t<sub>g</sub>)</div>
+        <div class="tw"><table>
+          <thead><tr><th>Design Vehicle</th><th>t<sub>g</sub> (base)</th><th>Lane Inc.</th></tr></thead>
+          <tbody>
+            <tr><td>Passenger Car</td><td>5.5 s</td><td>+0.5 s/lane</td></tr>
+            <tr><td>Single-Unit Truck</td><td>7.5 s</td><td>+0.7 s/lane</td></tr>
+            <tr><td>Combination Truck</td><td>9.5 s</td><td>+0.7 s/lane</td></tr>
+          </tbody>
+        </table></div>
+        <p class="hint">Assumes two-lane major road (1 opposing lane). Source: AASHTO Green Book, Exhibit 3-55 / Case F departure sight triangle.</p>
+      </div>
     </div>
+
   </div><!-- /isd -->
 
   <!-- ═══════════════ REF ═══════════════ -->
@@ -804,16 +943,19 @@
     </div>
 
     <div class="card">
-      <div class="card-title">AASHTO Case B Intersection Sight Distances (Passenger Car, Two-Lane, Flat)</div>
+      <div class="card-title">AASHTO Intersection Sight Distances — Passenger Car, Two-Lane, Flat Grade</div>
       <p class="hint" style="margin-bottom:.75rem">
-        ISD = 1.47 × V × t<sub>g</sub> (US) for base time gaps: B1 left = 7.5 s, B2 right = 6.5 s, B3 crossing = 6.5 s. Values rounded up to the nearest design increment.
+        Case A: both legs = SSD (PRT 2.5 s, a = 11.2 ft/s²) &nbsp;|&nbsp;
+        Case B: ISD = 1.47 × V × t<sub>g</sub> (base gaps: B1 = 7.5 s, B2/B3 = 6.5 s) &nbsp;|&nbsp;
+        Case F: major-road leg = 1.47 × V × 5.5 s; minor-road leg = SSD at cross-street speed.
       </p>
       <div class="tw"><table id="isd-tbl">
         <thead><tr>
           <th id="isd-th0">Speed (mph)</th>
+          <th id="isd-th-a">Case A — SSD Leg</th>
           <th id="isd-th1">B1 Left (7.5 s)</th>
-          <th id="isd-th2">B2 Right (6.5 s)</th>
-          <th id="isd-th3">B3 Crossing (6.5 s)</th>
+          <th id="isd-th2">B2/B3 Right/Cross (6.5 s)</th>
+          <th id="isd-th-f">Case F Major Leg (5.5 s)</th>
         </tr></thead>
         <tbody></tbody>
       </table></div>
@@ -1014,6 +1156,8 @@ const ISD_CASE_NAME = {
   B3: 'B3 — Crossing the major road',
 };
 const ISD_VEH_NAME = { pc: 'Passenger car', su: 'Single-unit truck', combo: 'Combination truck' };
+// Case F base time gaps (source: AASHTO Green Book, Exhibit 3-55)
+const ISD_TG_F = { pc: 5.5, su: 7.5, combo: 9.5 };
 
 // ══════════════════════════════════════════════════════
 //  STATE
@@ -1051,9 +1195,19 @@ function setUnits(u) {
   document.getElementById('dsd-v-u').textContent = su;
   document.getElementById('dsd-v').value = u === 'us' ? 60 : 100;
 
-  // ISD inputs
+  // ISD inputs — Case B
   document.getElementById('isd-v-u').textContent = su;
   document.getElementById('isd-v').value = u === 'us' ? 60 : 100;
+  // ISD inputs — Case A
+  document.getElementById('a-v-maj-u').textContent = su;
+  document.getElementById('a-v-min-u').textContent = su;
+  document.getElementById('a-v-maj').value = u === 'us' ? 50 : 80;
+  document.getElementById('a-v-min').value = u === 'us' ? 30 : 50;
+  // ISD inputs — Case F
+  document.getElementById('f-v-maj-u').textContent = su;
+  document.getElementById('f-v-min-u').textContent = su;
+  document.getElementById('f-v-maj').value = u === 'us' ? 50 : 80;
+  document.getElementById('f-v-min').value = u === 'us' ? 30 : 50;
 
   // Map inputs
   document.getElementById('map-v-u').textContent = su;
@@ -1321,6 +1475,101 @@ function isdCalc(v, caseB, veh, lanesCrossed, grade) {
   return { base, laneAdj, gradeAdj, tg, isd, adjustable };
 }
 
+// ── ISD case switcher ────────────────────────────────
+function showISDCase(id, btn) {
+  document.querySelectorAll('.isd-btn').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('.isd-panel').forEach(p => p.style.display = 'none');
+  btn.classList.add('on');
+  document.getElementById('isd-panel-' + id).style.display = 'block';
+}
+
+// ── Case A — No Control ──────────────────────────────
+function calcISD_A() {
+  const vMaj = parseFloat(document.getElementById('a-v-maj').value);
+  const vMin = parseFloat(document.getElementById('a-v-min').value);
+  const gMaj = parseFloat(document.getElementById('a-g-maj').value);
+  const gMin = parseFloat(document.getElementById('a-g-min').value);
+  if ([vMaj, vMin, gMaj, gMin].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const decel = units === 'us' ? 11.2 : 3.4;
+  const prt   = 2.5;
+  const K     = units === 'us' ? '1.47' : '0.278';
+  const D     = units === 'us' ? '30'   : '254';
+  const du    = units === 'us' ? 'ft'   : 'm';
+  const su    = units === 'us' ? 'mph'  : 'km/h';
+  const a_g   = (decel / (units === 'us' ? 32.2 : 9.81)).toFixed(3);
+
+  const maj = ssdCalc(vMaj, gMaj, prt, decel);
+  const min = ssdCalc(vMin, gMin, prt, decel);
+  if (!maj || !min) { alert('Invalid grade: deceleration minus grade ≤ 0.'); return; }
+
+  document.getElementById('a-maj').textContent    = Math.ceil(maj.ssd);
+  document.getElementById('a-maj-dr').textContent = maj.dr.toFixed(1);
+  document.getElementById('a-maj-db').textContent = maj.db.toFixed(1);
+  document.getElementById('a-min').textContent    = Math.ceil(min.ssd);
+  document.getElementById('a-min-dr').textContent = min.dr.toFixed(1);
+  document.getElementById('a-min-db').textContent = min.db.toFixed(1);
+  for (let i = 1; i <= 6; i++)
+    document.getElementById('a-u' + i).textContent = du;
+
+  const fmtG = (g) => (g >= 0 ? '+' : '') + (g/100).toFixed(3);
+  document.getElementById('a-formula').textContent =
+    `Case A — No Traffic Control: each sight triangle leg = SSD at that road's design speed.\n\n`+
+    `Major road leg (${vMaj} ${su}, grade ${gMaj > 0 ? '+' : ''}${gMaj}%):\n`+
+    `  SSD = ${K} × ${vMaj} × ${prt}  +  ${vMaj}² / (${D} × (${a_g} ${fmtG(gMaj)}))\n`+
+    `      = ${maj.dr.toFixed(1)} + ${maj.db.toFixed(1)} = ${maj.ssd.toFixed(1)} ${du}  →  ${Math.ceil(maj.ssd)} ${du}\n\n`+
+    `Minor road leg (${vMin} ${su}, grade ${gMin > 0 ? '+' : ''}${gMin}%):\n`+
+    `  SSD = ${K} × ${vMin} × ${prt}  +  ${vMin}² / (${D} × (${a_g} ${fmtG(gMin)}))\n`+
+    `      = ${min.dr.toFixed(1)} + ${min.db.toFixed(1)} = ${min.ssd.toFixed(1)} ${du}  →  ${Math.ceil(min.ssd)} ${du}`;
+
+  document.getElementById('a-out').style.display = 'block';
+}
+
+// ── Case F — Left Turn from Major Road ──────────────
+function calcISD_F() {
+  const vMaj  = parseFloat(document.getElementById('f-v-maj').value);
+  const vMin  = parseFloat(document.getElementById('f-v-min').value);
+  const veh   = document.getElementById('f-veh').value;
+  const lanes = parseFloat(document.getElementById('f-lanes').value);
+  if ([vMaj, vMin, lanes].some(isNaN)) { alert('Please enter valid numeric values.'); return; }
+
+  const K    = units === 'us' ? 1.47  : 0.278;
+  const du   = units === 'us' ? 'ft'  : 'm';
+  const su   = units === 'us' ? 'mph' : 'km/h';
+  const decel = units === 'us' ? 11.2 : 3.4;
+
+  const base    = ISD_TG_F[veh];
+  const laneAdj = Math.max(0, Math.round(lanes) - 1) * ISD_LANE_INC[veh];
+  const tg      = base + laneAdj;
+  const isdMaj  = Math.ceil(K * vMaj * tg);
+
+  // Minor road leg = SSD at cross-street speed, flat, AASHTO defaults
+  const minRes  = ssdCalc(vMin, 0, 2.5, decel);
+  const isdMin  = minRes ? Math.ceil(minRes.ssd) : '—';
+
+  document.getElementById('f-tgbase').textContent  = base.toFixed(1);
+  document.getElementById('f-adjlane').textContent = '+' + laneAdj.toFixed(1);
+  document.getElementById('f-tg').textContent      = tg.toFixed(1);
+  document.getElementById('f-maj').textContent     = isdMaj;
+  document.getElementById('f-min').textContent     = isdMin;
+  document.getElementById('f-u1').textContent = du;
+  document.getElementById('f-u2').textContent = du;
+
+  document.getElementById('f-formula').textContent =
+    `Case F — Left Turn from Major Road   |   ${ISD_VEH_NAME[veh]}\n\n`+
+    `── Leg along major road (watching oncoming traffic) ──\n`+
+    `Base t_g = ${base.toFixed(1)} s\n`+
+    `Lane adj = max(0, ${Math.round(lanes)} − 1) × ${ISD_LANE_INC[veh]} = +${laneAdj.toFixed(1)} s\n`+
+    `Adjusted t_g = ${tg.toFixed(1)} s\n`+
+    `ISD = ${K === 1.47 ? '1.47' : '0.278'} × ${vMaj} × ${tg.toFixed(1)}\n`+
+    `    = ${(K * vMaj * tg).toFixed(1)} ${du}   →   Design value: ${isdMaj} ${du}\n\n`+
+    `── Leg along minor road (watching cross-street traffic) ──\n`+
+    `Uses SSD at cross-street speed (${vMin} ${su}, flat, AASHTO defaults):\n`+
+    `ISD = ${isdMin} ${du}`;
+
+  document.getElementById('f-out').style.display = 'block';
+}
+
 function onIsdCaseChange() {
   const caseB = document.getElementById('isd-case').value;
   const adjustable = (caseB === 'B1' || caseB === 'B3');
@@ -1476,27 +1725,31 @@ function buildDSDTable() {
 }
 
 function buildISDTable() {
-  const su = units === 'us' ? 'mph' : 'km/h';
-  const du = units === 'us' ? 'ft'  : 'm';
+  const su    = units === 'us' ? 'mph' : 'km/h';
+  const du    = units === 'us' ? 'ft'  : 'm';
+  const K     = units === 'us' ? 1.47  : 0.278;
+  const decel = units === 'us' ? 11.2  : 3.4;
   const speeds = units === 'us'
     ? [15,20,25,30,35,40,45,50,55,60,65,70,75,80]
     : [20,30,40,50,60,70,80,90,100,110,120,130];
-  const K = units === 'us' ? 1.47 : 0.278;
 
-  document.getElementById('isd-th0').textContent = `Speed (${su})`;
-  document.getElementById('isd-th1').innerHTML   = `B1 Left, 7.5 s (${du})`;
-  document.getElementById('isd-th2').innerHTML   = `B2 Right, 6.5 s (${du})`;
-  document.getElementById('isd-th3').innerHTML   = `B3 Crossing, 6.5 s (${du})`;
+  document.getElementById('isd-th0').textContent  = `Speed (${su})`;
+  document.getElementById('isd-th-a').innerHTML   = `Case A SSD (${du})`;
+  document.getElementById('isd-th1').innerHTML    = `B1 Left t<sub>g</sub>=7.5 s (${du})`;
+  document.getElementById('isd-th2').innerHTML    = `B2/B3 t<sub>g</sub>=6.5 s (${du})`;
+  document.getElementById('isd-th-f').innerHTML   = `Case F Major t<sub>g</sub>=5.5 s (${du})`;
 
   const tbody = document.querySelector('#isd-tbl tbody');
   tbody.innerHTML = '';
   speeds.forEach(v => {
-    const b1 = Math.ceil(K * v * 7.5);
-    const b2 = Math.ceil(K * v * 6.5);
-    const b3 = Math.ceil(K * v * 6.5);
+    const ssdRes = ssdCalc(v, 0, 2.5, decel);
+    const caseA  = ssdRes ? Math.ceil(ssdRes.ssd) : '—';
+    const b1     = Math.ceil(K * v * 7.5);
+    const b23    = Math.ceil(K * v * 6.5);
+    const caseF  = Math.ceil(K * v * 5.5);
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${v}</td><td><strong>${b1}</strong></td>`+
-                   `<td>${b2}</td><td>${b3}</td>`;
+    tr.innerHTML = `<td>${v}</td><td>${caseA}</td><td><strong>${b1}</strong></td>`+
+                   `<td>${b23}</td><td>${caseF}</td>`;
     tbody.appendChild(tr);
   });
 }
