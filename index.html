@@ -735,6 +735,16 @@
         <div class="spinner"></div>
         <span>Fetching elevation data…</span>
       </div>
+      <div id="map-grade-manual" style="display:none; margin-top:.85rem;">
+        <div class="fg" style="max-width:230px;">
+          <label>Manual Grade (+ uphill / − downhill)</label>
+          <div class="iw">
+            <input type="number" id="map-manual-grade" value="0" min="-15" max="15" step="0.1">
+            <span class="ul">%</span>
+          </div>
+        </div>
+        <p class="hint">Elevation fetch failed — enter grade manually, then click Recalculate.</p>
+      </div>
       <div style="margin-top:.75rem; display:flex; gap:.5rem; flex-wrap:wrap;">
         <button class="btn" style="margin-top:0;" onclick="recalcMap()" id="map-recalc-btn" disabled>Recalculate</button>
         <button class="btn ghost" style="margin-top:0; margin-left:0;" onclick="resetMap()">Reset Pins</button>
@@ -1230,9 +1240,9 @@ function buildDSDTable() {
 //  MAP / GRADE TOOL
 // ══════════════════════════════════════════════════════
 let _map = null;
-let _pins = [];          // [{lat, lng, marker}]
-let _overlays = [];      // L.layer objects to clear on reset
-let _lastElevs = null;   // cached elevation result for recalc
+let _pins = [];
+let _overlays = [];
+let _lastCalcInputs = null;
 
 function initMap() {
   _map = L.map('sightmap').setView([39.5, -98.35], 4);
@@ -1245,27 +1255,23 @@ function initMap() {
 
 function onMapClick(e) {
   const { lat, lng } = e.latlng;
-
   if (_pins.length >= 2) { resetMap(); }
 
   const label = _pins.length === 0 ? 'A' : 'B';
   const color  = label === 'A' ? '#1a4b8c' : '#ea580c';
-
   const icon = L.divIcon({
     className: '',
     html: `<div style="width:28px;height:28px;background:${color};border:2.5px solid #fff;
            border-radius:50%;display:flex;align-items:center;justify-content:center;
            color:#fff;font-weight:800;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.35)">
            ${label}</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
+    iconSize: [28, 28], iconAnchor: [14, 14]
   });
 
-  const marker = L.marker([lat, lng], { icon }).addTo(_map);
-  _pins.push({ lat, lng, marker });
+  _pins.push({ lat, lng, marker: L.marker([lat, lng], { icon }).addTo(_map) });
 
   if (_pins.length === 1) {
-    setMapStatus(`Step 2 — Click a second point along the road to define the direction and grade.`);
+    setMapStatus('Step 2 — Click a second point along the road to define direction and grade.');
   } else {
     runMapCalc();
   }
@@ -1273,42 +1279,89 @@ function onMapClick(e) {
 
 async function runMapCalc() {
   const [A, B] = _pins;
-
-  // Draw segment line
-  const line = L.polyline([[A.lat, A.lng], [B.lat, B.lng]], {
-    color: '#1a4b8c', weight: 2.5, dashArray: '6 4', opacity: .8
-  }).addTo(_map);
-  _overlays.push(line);
-
-  // Show spinner
+  document.getElementById('map-grade-manual').style.display = 'none';
   document.getElementById('map-spinner').style.display = 'flex';
-  setMapStatus('Fetching elevation data from SRTM…');
   document.getElementById('map-out').style.display = 'none';
   document.getElementById('map-recalc-btn').disabled = true;
+  setMapStatus('Trying elevation APIs…');
 
-  try {
-    const res = await fetch(
-      `https://api.opentopodata.org/v1/srtm90m?locations=${A.lat},${A.lng}|${B.lat},${B.lng}`
-    );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.status !== 'OK') throw new Error(data.status || 'API error');
+  const distM = haversineM(A.lat, A.lng, B.lat, B.lng);
+  const elevs = await fetchElevations(A.lat, A.lng, B.lat, B.lng);
+  document.getElementById('map-spinner').style.display = 'none';
 
-    const elevA = data.results[0].elevation;
-    const elevB = data.results[1].elevation;
-    if (elevA === null || elevB === null) throw new Error('No elevation data at one or both points (ocean/no-data area).');
-
-    _lastElevs = { elevA, elevB };
-    renderMapResults(A, B, elevA, elevB);
-
-  } catch (err) {
-    document.getElementById('map-spinner').style.display = 'none';
-    setMapStatus('Error: ' + err.message, 'err');
+  if (elevs) {
+    const gradePct = ((elevs.elevB - elevs.elevA) / distM) * 100;
+    _lastCalcInputs = { A, B, distM, gradePct, elevA: elevs.elevA, elevB: elevs.elevB, src: elevs.src };
+    renderMapResults();
+  } else {
+    setMapStatus('All elevation APIs unreachable — enter the road grade manually below.', 'err');
+    document.getElementById('map-grade-manual').style.display = 'block';
+    _lastCalcInputs = { A, B, distM, gradePct: null, elevA: null, elevB: null, src: null };
+    document.getElementById('map-recalc-btn').disabled = false;
   }
 }
 
-function renderMapResults(A, B, elevA, elevB) {
-  document.getElementById('map-spinner').style.display = 'none';
+// Try three public elevation APIs in sequence; return first that works.
+async function fetchElevations(lat1, lng1, lat2, lng2) {
+  // 1 — Open-Topo-Data (global SRTM 90 m)
+  try {
+    const r = await withTimeout(
+      fetch(`https://api.opentopodata.org/v1/srtm90m?locations=${lat1},${lng1}|${lat2},${lng2}`), 7000);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.status === 'OK' && d.results[0].elevation !== null && d.results[1].elevation !== null)
+        return { elevA: d.results[0].elevation, elevB: d.results[1].elevation, src: 'Open-Topo-Data SRTM' };
+    }
+  } catch (_) {}
+
+  // 2 — Open-Elevation
+  try {
+    const r = await withTimeout(fetch('https://api.open-elevation.com/api/v1/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locations: [
+        { latitude: lat1, longitude: lng1 },
+        { latitude: lat2, longitude: lng2 }
+      ]})
+    }), 7000);
+    if (r.ok) {
+      const d = await r.json();
+      if (d.results?.length >= 2)
+        return { elevA: d.results[0].elevation, elevB: d.results[1].elevation, src: 'Open-Elevation' };
+    }
+  } catch (_) {}
+
+  // 3 — USGS EPQS (US locations)
+  try {
+    const [r1, r2] = await Promise.all([
+      withTimeout(fetch(`https://epqs.nationalmap.gov/v1/json?x=${lng1}&y=${lat1}&units=Meters&includeDate=false`), 7000),
+      withTimeout(fetch(`https://epqs.nationalmap.gov/v1/json?x=${lng2}&y=${lat2}&units=Meters&includeDate=false`), 7000)
+    ]);
+    if (r1.ok && r2.ok) {
+      const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+      const e1 = parseFloat(d1.value ?? d1.elevation);
+      const e2 = parseFloat(d2.value ?? d2.elevation);
+      if (!isNaN(e1) && !isNaN(e2))
+        return { elevA: e1, elevB: e2, src: 'USGS EPQS' };
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+function withTimeout(promise, ms) {
+  return Promise.race([promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
+}
+
+function renderMapResults() {
+  const { A, B, distM, elevA, elevB, src } = _lastCalcInputs;
+  let { gradePct } = _lastCalcInputs;
+
+  // Use manual grade when elevation fetch failed
+  if (gradePct === null) {
+    gradePct = parseFloat(document.getElementById('map-manual-grade').value) || 0;
+  }
 
   const speed = parseFloat(document.getElementById('map-v').value) || 60;
   const prt   = parseFloat(document.getElementById('map-t').value) || 2.5;
@@ -1316,59 +1369,45 @@ function renderMapResults(A, B, elevA, elevB) {
   const du    = units === 'us' ? 'ft' : 'm';
   const su    = units === 'us' ? 'mph' : 'km/h';
 
-  // Horizontal distance (metres)
-  const distM = haversineM(A.lat, A.lng, B.lat, B.lng);
-  const distDisplay = units === 'us' ? distM * 3.28084 : distM;
-
-  // Grade always computed in metres
-  const gradePct = ((elevB - elevA) / distM) * 100;
-
-  // SSD
   const res = ssdCalc(speed, gradePct, prt, decel);
-  if (!res) {
-    setMapStatus('Grade exceeds deceleration capacity — SSD undefined. Try a smaller downhill grade or increase deceleration.', 'err');
-    return;
-  }
+  if (!res) { setMapStatus('Grade exceeds deceleration capacity — SSD undefined.', 'err'); return; }
+
   const { dr, db, ssd } = res;
-  const ssdM = units === 'us' ? ssd * 0.3048 : ssd;
+  const ssdM        = units === 'us' ? ssd * 0.3048 : ssd;
+  const distDisplay = units === 'us' ? distM * 3.28084 : distM;
+  const gradeSign   = gradePct >= 0 ? '+' : '';
 
-  // ── Draw SSD circle (orange dashed ring)
-  const circle = L.circle([A.lat, A.lng], {
-    radius: ssdM,
-    color: '#ea580c',
-    fillColor: '#ea580c',
-    fillOpacity: .08,
-    weight: 2,
-    dashArray: '8 5'
-  }).addTo(_map);
-  _overlays.push(circle);
+  // Redraw overlays
+  _overlays.forEach(o => _map.removeLayer(o));
+  _overlays = [];
 
-  // ── Mark SSD endpoint along A→B bearing
+  _overlays.push(L.polyline([[A.lat, A.lng], [B.lat, B.lng]], {
+    color: '#1a4b8c', weight: 2.5, dashArray: '6 4', opacity: .8
+  }).addTo(_map));
+
+  _overlays.push(L.circle([A.lat, A.lng], {
+    radius: ssdM, color: '#ea580c', fillColor: '#ea580c',
+    fillOpacity: .08, weight: 2, dashArray: '8 5'
+  }).addTo(_map));
+
   const bearing = bearingRad(A.lat, A.lng, B.lat, B.lng);
   const ep = destPoint(A.lat, A.lng, ssdM, bearing);
-  const epIcon = L.divIcon({
+  _overlays.push(L.marker([ep.lat, ep.lng], { icon: L.divIcon({
     className: '',
     html: `<div style="background:#ea580c;color:#fff;padding:2px 7px;border-radius:4px;
            font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3)">
            SSD: ${Math.ceil(ssd)} ${du}</div>`,
     iconAnchor: [0, 8]
-  });
-  const epMarker = L.marker([ep.lat, ep.lng], { icon: epIcon }).addTo(_map);
-  _overlays.push(epMarker);
+  })}).addTo(_map));
 
-  // Fit map to show everything
-  const bounds = L.latLngBounds([
-    [A.lat, A.lng], [B.lat, B.lng], [ep.lat, ep.lng]
-  ]);
-  _map.fitBounds(bounds.pad(0.25));
+  _map.fitBounds(L.latLngBounds([[A.lat,A.lng],[B.lat,B.lng],[ep.lat,ep.lng]]).pad(0.25));
 
-  // ── Update result card
+  // Result card
   const minTable = units === 'us' ? SSD_MIN_US : SSD_MIN_SI;
-  const minVal = lookupMin(minTable, speed);
-  const gradeSign = gradePct >= 0 ? '+' : '';
+  const minVal   = lookupMin(minTable, speed);
 
-  document.getElementById('map-elev-a').textContent = elevA.toFixed(1);
-  document.getElementById('map-elev-b').textContent = elevB.toFixed(1);
+  document.getElementById('map-elev-a').textContent = elevA !== null ? elevA.toFixed(1) : '—';
+  document.getElementById('map-elev-b').textContent = elevB !== null ? elevB.toFixed(1) : '—';
   document.getElementById('map-dist').textContent   = distDisplay.toFixed(0);
   document.getElementById('map-grade').textContent  = gradeSign + gradePct.toFixed(2);
   document.getElementById('map-dr').textContent     = dr.toFixed(1);
@@ -1387,48 +1426,44 @@ function renderMapResults(A, B, elevA, elevB) {
     document.getElementById('map-cmp-txt').textContent = pass
       ? `SSD (${Math.ceil(ssd)} ${du}) meets AASHTO minimum (${minVal} ${du})`
       : `SSD (${Math.ceil(ssd)} ${du}) is BELOW AASHTO minimum (${minVal} ${du})`;
-  } else {
-    cmp.style.display = 'none';
-  }
+  } else { cmp.style.display = 'none'; }
 
   const K   = units === 'us' ? '1.47' : '0.278';
   const D   = units === 'us' ? '30'   : '254';
-  const G   = (gradePct / 100).toFixed(4);
+  const G   = Math.abs(gradePct / 100).toFixed(4);
   const a_g = (decel / (units === 'us' ? 32.2 : 9.81)).toFixed(4);
+  const elevLine = elevA !== null
+    ? `Elevation A = ${elevA.toFixed(2)} m  |  Elevation B = ${elevB.toFixed(2)} m  [${src}]\n`+
+      `Horizontal distance = ${distM.toFixed(1)} m\n`+
+      `Grade = (${elevB.toFixed(2)} − ${elevA.toFixed(2)}) / ${distM.toFixed(1)} = ${gradeSign}${gradePct.toFixed(3)} %\n\n`
+    : `Grade entered manually: ${gradeSign}${gradePct.toFixed(2)} %\n\n`;
   document.getElementById('map-formula').textContent =
-    `Elevation A = ${elevA.toFixed(2)} m  |  Elevation B = ${elevB.toFixed(2)} m\n`+
-    `Horizontal distance = ${distM.toFixed(1)} m\n`+
-    `Grade G = (${elevB.toFixed(2)} − ${elevA.toFixed(2)}) / ${distM.toFixed(1)} = ${gradeSign}${gradePct.toFixed(3)} %\n\n`+
+    elevLine +
     `SSD = ${K} × V × t  +  V² / (${D} × (a/g ${gradeSign} G))\n`+
-    `    = ${K} × ${speed} × ${prt}  +  ${speed}² / (${D} × (${a_g} ${gradeSign} ${Math.abs(gradePct/100).toFixed(4)}))\n`+
+    `    = ${K} × ${speed} × ${prt}  +  ${speed}² / (${D} × (${a_g} ${gradeSign} ${G}))\n`+
     `    = ${dr.toFixed(1)} + ${db.toFixed(1)}\n`+
     `    = ${ssd.toFixed(1)} ${du}   →   Design value: ${Math.ceil(ssd)} ${du}`;
 
   document.getElementById('map-out').style.display = 'block';
   document.getElementById('map-recalc-btn').disabled = false;
   setMapStatus(
-    `Grade: ${gradeSign}${gradePct.toFixed(2)}%  |  SSD: ${Math.ceil(ssd)} ${du} at ${speed} ${su}  —  Click map to reset and place new pins.`,
+    `Grade: ${gradeSign}${gradePct.toFixed(2)}%  |  SSD: ${Math.ceil(ssd)} ${du} at ${speed} ${su}  —  Click map to reset.`,
     'ready'
   );
 }
 
 function recalcMap() {
-  if (_pins.length < 2 || !_lastElevs) return;
-  // Clear only overlays (keep pins)
-  _overlays.forEach(o => _map.removeLayer(o));
-  _overlays = [];
-  const [A, B] = _pins;
-  renderMapResults(A, B, _lastElevs.elevA, _lastElevs.elevB);
+  if (_pins.length < 2 || !_lastCalcInputs) return;
+  renderMapResults();
 }
 
 function resetMap() {
   _pins.forEach(p => _map.removeLayer(p.marker));
   _overlays.forEach(o => _map.removeLayer(o));
-  _pins = [];
-  _overlays = [];
-  _lastElevs = null;
+  _pins = []; _overlays = []; _lastCalcInputs = null;
   document.getElementById('map-out').style.display = 'none';
   document.getElementById('map-spinner').style.display = 'none';
+  document.getElementById('map-grade-manual').style.display = 'none';
   document.getElementById('map-recalc-btn').disabled = true;
   setMapStatus('Step 1 — Click anywhere on the map to place <strong>Point A</strong> (driver position).');
 }
@@ -1442,31 +1477,24 @@ function setMapStatus(msg, cls = '') {
 // ── Geo helpers ──────────────────────────────────────
 function haversineM(lat1, lng1, lat2, lng2) {
   const R = 6371000;
-  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lng2 - lng1) * Math.PI / 180;
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2 - lat1) * Math.PI/180, Δλ = (lng2 - lng1) * Math.PI/180;
   const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 function bearingRad(lat1, lng1, lat2, lng2) {
-  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
-  const Δλ = (lng2 - lng1) * Math.PI/180;
-  const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-  return Math.atan2(y, x);
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180, Δλ = (lng2-lng1)*Math.PI/180;
+  return Math.atan2(Math.sin(Δλ)*Math.cos(φ2),
+    Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ));
 }
 
 function destPoint(lat, lng, distM, bearingR) {
-  const R = 6371000;
-  const φ = lat * Math.PI/180, λ = lng * Math.PI/180;
-  const φ2 = Math.asin(Math.sin(φ)*Math.cos(distM/R) +
-              Math.cos(φ)*Math.sin(distM/R)*Math.cos(bearingR));
-  const λ2 = λ + Math.atan2(
-    Math.sin(bearingR)*Math.sin(distM/R)*Math.cos(φ),
-    Math.cos(distM/R) - Math.sin(φ)*Math.sin(φ2)
-  );
-  return { lat: φ2 * 180/Math.PI, lng: λ2 * 180/Math.PI };
+  const R = 6371000, φ = lat*Math.PI/180, λ = lng*Math.PI/180;
+  const φ2 = Math.asin(Math.sin(φ)*Math.cos(distM/R) + Math.cos(φ)*Math.sin(distM/R)*Math.cos(bearingR));
+  const λ2 = λ + Math.atan2(Math.sin(bearingR)*Math.sin(distM/R)*Math.cos(φ),
+               Math.cos(distM/R) - Math.sin(φ)*Math.sin(φ2));
+  return { lat: φ2*180/Math.PI, lng: λ2*180/Math.PI };
 }
 
 // ══════════════════════════════════════════════════════
