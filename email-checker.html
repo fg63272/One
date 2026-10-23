@@ -1,0 +1,642 @@
+<title>Email Address Checker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=JetBrains+Mono:wght@400;600&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow column; the address card wears an airmail stripe, results stack beneath it. */
+:root {
+  --paper: #f4f6fb;
+  --surface: #ffffff;
+  --ink: #172033;
+  --muted: #586179;
+  --line: #dce1eb;
+  --accent: #2340a8;
+  --stamp: #c2372f;
+  --ok: #1b7a49;
+  --warn: #9a5c00;
+  --bad: #b42318;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Public Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0e131e; --surface: #161d2b; --ink: #e6eaf3; --muted: #9ba5ba; --line: #2a3347;
+    --accent: #8ea6ff; --stamp: #ff7d70; --ok: #52c58f; --warn: #f0b24a; --bad: #ff8a80;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0e131e; --surface: #161d2b; --ink: #e6eaf3; --muted: #9ba5ba; --line: #2a3347;
+  --accent: #8ea6ff; --stamp: #ff7d70; --ok: #52c58f; --warn: #f0b24a; --bad: #ff8a80;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 48px;
+}
+.wrap { max-width: 780px; margin: 0 auto; display: grid; gap: 24px; }
+header { display: grid; gap: 6px; }
+h1 { font: 700 clamp(28px, 5vw, 38px)/1.1 var(--font-display); letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.lede { margin: 0; color: var(--muted); max-width: 62ch; }
+code, .mono { font-family: var(--font-mono); }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.tab {
+  font: 600 14px var(--font-body); color: var(--muted); background: none; border: 0;
+  padding: 10px 14px; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
+}
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tab:hover { color: var(--ink); }
+
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.envelope {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+.envelope::before {
+  content: ""; display: block; height: 7px;
+  background: repeating-linear-gradient(-45deg,
+    var(--stamp) 0 12px, transparent 12px 18px, var(--accent) 18px 30px, transparent 30px 36px);
+}
+.envelope-body { padding: 20px; display: grid; gap: 14px; }
+label.field { font: 600 12px var(--font-body); text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+#addr {
+  width: 100%; font: 400 clamp(16px, 3.4vw, 20px) var(--font-mono); padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+}
+#addr:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+
+.samples { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.chip {
+  font: 400 12.5px var(--font-mono); padding: 4px 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: transparent; color: var(--ink);
+}
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Anatomy strip: name part | @ | domain */
+.anatomy { display: flex; align-items: stretch; gap: 0; overflow-x: auto; font-family: var(--font-mono); }
+.seg { display: grid; gap: 4px; min-width: 0; }
+.seg .txt { font-size: clamp(15px, 3vw, 18px); padding: 6px 2px; border-bottom: 3px solid var(--line); white-space: pre; }
+.seg .cap { font: 500 11.5px var(--font-body); color: var(--muted); letter-spacing: 0.02em; white-space: nowrap; }
+.seg[data-s="pass"] .txt { border-bottom-color: var(--ok); }
+.seg[data-s="warn"] .txt { border-bottom-color: var(--warn); }
+.seg[data-s="fail"] .txt { border-bottom-color: var(--bad); }
+.seg.at .txt { color: var(--muted); padding-inline: 4px; }
+
+.verdict { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.pill {
+  font: 700 13px var(--font-body); letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 6px; border: 1.5px solid currentColor; white-space: nowrap;
+}
+.pill[data-v="valid"] { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); }
+.pill[data-v="risky"] { color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.pill[data-v="invalid"] { color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.verdict-text { flex: 1 1 260px; min-width: 0; }
+
+.suggest {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.suggest .mono { word-break: break-all; }
+.btn {
+  font: 600 13.5px var(--font-body); padding: 7px 12px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface);
+}
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:hover { filter: brightness(1.08); }
+
+.checks { list-style: none; margin: 0; padding: 0; display: grid; }
+.checks li {
+  display: grid; grid-template-columns: 26px 130px minmax(0, 1fr); gap: 4px 10px; align-items: baseline;
+  padding: 10px 0; border-top: 1px solid var(--line);
+}
+.checks li:first-child { border-top: 0; }
+.checks .name { font-weight: 600; }
+.checks .detail { color: var(--muted); overflow-wrap: anywhere; }
+@media (max-width: 520px) {
+  .checks li { grid-template-columns: 26px minmax(0, 1fr); }
+  .checks .detail { grid-column: 2; }
+}
+.mark {
+  width: 20px; height: 20px; border-radius: 50%; display: inline-grid; place-items: center;
+  font: 700 12px var(--font-body); color: var(--surface); background: var(--muted); transform: translateY(3px);
+}
+.mark[data-s="pass"] { background: var(--ok); }
+.mark[data-s="warn"] { background: var(--warn); }
+.mark[data-s="fail"] { background: var(--bad); }
+.mark[data-s="info"] { background: var(--accent); }
+.mark[data-s="pending"], .mark[data-s="skip"] { background: transparent; color: var(--muted); border: 1.5px dashed var(--muted); }
+
+/* Bulk */
+#list {
+  width: 100%; min-height: 180px; resize: vertical; font: 400 14px/1.6 var(--font-mono);
+  padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+}
+.row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.toggle { display: inline-flex; gap: 8px; align-items: center; font-size: 14px; cursor: pointer; }
+.hint { font-size: 13px; color: var(--muted); }
+.tally { display: grid; gap: 8px; }
+.bar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.bar span { display: block; height: 100%; transition: width .25s ease; }
+.bar .v { background: var(--ok); } .bar .r { background: var(--warn); } .bar .i { background: var(--bad); }
+.counts { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.counts b { font-weight: 600; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+thead th { border-top: 0; font: 600 12px var(--font-body); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); background: var(--paper); }
+td.n { color: var(--muted); font-variant-numeric: tabular-nums; width: 1%; }
+td.a { font-family: var(--font-mono); word-break: break-all; min-width: 180px; }
+td.why { color: var(--muted); min-width: 200px; }
+td .pill { font-size: 11px; padding: 2px 7px; }
+#copyFallback { width: 100%; min-height: 90px; font: 13px var(--font-mono); padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+
+.limits { font-size: 13.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; max-width: 70ch; }
+.limits p { margin: 0 0 6px; }
+
+@media (prefers-reduced-motion: reduce) { .bar span { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Email Address Checker</h1>
+    <p class="lede">Checks an address against the email standards (RFC 5321 and 5322), catches common domain typos and throwaway inboxes, and looks up the domain's mail servers.</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-single" aria-selected="true" aria-controls="panel-single">One address</button>
+    <button class="tab" role="tab" id="tab-bulk" aria-selected="false" aria-controls="panel-bulk">A list</button>
+  </div>
+
+  <section id="panel-single" role="tabpanel" aria-labelledby="tab-single">
+    <div class="envelope">
+      <div class="envelope-body">
+        <label class="field" for="addr">Email address</label>
+        <input id="addr" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" value="sam.rivera@gmial.com">
+        <div class="samples" id="samples"><span>Try:</span></div>
+        <div class="anatomy" id="anatomy" aria-hidden="true"></div>
+        <div class="verdict" id="verdict"></div>
+        <div class="suggest" id="suggest" hidden></div>
+        <ul class="checks" id="checks"></ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-bulk" role="tabpanel" aria-labelledby="tab-bulk" hidden>
+    <div class="envelope">
+      <div class="envelope-body">
+        <label class="field" for="list">Addresses, one per line (commas and semicolons also work)</label>
+        <textarea id="list" spellcheck="false"></textarea>
+        <div class="row">
+          <label class="toggle"><input type="checkbox" id="dnsToggle" checked> Look up mail servers</label>
+          <span class="hint" id="bulkHint">Sample list. Paste your own to replace it.</span>
+        </div>
+        <div class="tally" id="tally"></div>
+        <div class="row">
+          <button class="btn" id="copyValid" type="button">Copy valid addresses</button>
+          <button class="btn ghost" id="copyCsv" type="button">Copy results as CSV</button>
+          <span class="hint" id="copyMsg" role="status"></span>
+        </div>
+        <textarea id="copyFallback" readonly hidden></textarea>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Address</th><th>Result</th><th>Reason</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="limits">
+    <p><strong>What this can't tell you.</strong> A correct format and working mail servers mean mail can be delivered to the domain. They don't prove the mailbox exists or that someone reads it. Only a delivered message, such as a confirmation link, proves that.</p>
+    <p>The mail server lookup uses Cloudflare's public DNS. Where the page can't reach it, that row says so and the other checks still run.</p>
+  </footer>
+</div>
+
+<script id="core">
+// ---- Reference data -------------------------------------------------------
+const PROVIDERS = {
+  "gmail.com": "Gmail", "googlemail.com": "Gmail", "yahoo.com": "Yahoo Mail", "ymail.com": "Yahoo Mail",
+  "yahoo.co.uk": "Yahoo Mail", "yahoo.fr": "Yahoo Mail", "yahoo.de": "Yahoo Mail", "yahoo.ca": "Yahoo Mail",
+  "hotmail.com": "Outlook.com", "hotmail.co.uk": "Outlook.com", "hotmail.fr": "Outlook.com", "hotmail.it": "Outlook.com",
+  "outlook.com": "Outlook.com", "live.com": "Outlook.com", "live.co.uk": "Outlook.com", "msn.com": "Outlook.com",
+  "icloud.com": "iCloud Mail", "me.com": "iCloud Mail", "mac.com": "iCloud Mail", "aol.com": "AOL Mail",
+  "proton.me": "Proton Mail", "protonmail.com": "Proton Mail", "pm.me": "Proton Mail", "gmx.com": "GMX",
+  "gmx.de": "GMX", "gmx.net": "GMX", "web.de": "WEB.DE", "mail.com": "mail.com", "email.com": "mail.com",
+  "zoho.com": "Zoho Mail", "fastmail.com": "Fastmail", "hey.com": "HEY", "yandex.ru": "Yandex Mail",
+  "mail.ru": "Mail.ru", "qq.com": "QQ Mail", "163.com": "NetEase", "comcast.net": "Xfinity",
+  "verizon.net": "Verizon", "att.net": "AT&T", "sbcglobal.net": "AT&T", "btinternet.com": "BT", "orange.fr": "Orange"
+};
+const TLD_TYPOS = {
+  con: "com", cmo: "com", cpm: "com", cim: "com", vom: "com", xom: "com", ocm: "com", comm: "com", coom: "com", copm: "com", om: "com",
+  nte: "net", ent: "net", nett: "net", ogr: "org", rog: "org", orgg: "org"
+};
+const DISPOSABLE = new Set([
+  "mailinator.com", "guerrillamail.com", "guerrillamail.net", "guerrillamailblock.com", "sharklasers.com", "grr.la",
+  "pokemail.net", "spam4.me", "10minutemail.com", "20minutemail.com", "temp-mail.org", "temp-mail.io", "tempmail.com",
+  "tempmailo.com", "tempail.com", "tempinbox.com", "tempr.email", "mytemp.email", "yopmail.com", "yopmail.fr",
+  "yopmail.net", "trashmail.com", "getnada.com", "dispostable.com", "maildrop.cc", "throwawaymail.com",
+  "fakeinbox.com", "mintemail.com", "mohmal.com", "emailondeck.com", "mailnesia.com", "spamgourmet.com",
+  "burnermail.io", "mailcatch.com", "discard.email", "moakt.com", "inboxkitten.com", "mailpoof.com", "tmail.ws",
+  "1secmail.com", "emailfake.com", "crazymailing.com", "mail.tm", "harakirimail.com", "spambox.us", "jetable.org",
+  "mailexpire.com", "incognitomail.org", "anonbox.net", "mailsac.com", "dropmail.me", "minuteinbox.com", "33mail.com"
+]);
+const ROLES = new Set([
+  "admin", "administrator", "info", "support", "sales", "contact", "help", "noreply", "no-reply", "donotreply",
+  "do-not-reply", "webmaster", "postmaster", "hostmaster", "abuse", "billing", "marketing", "office", "team",
+  "hello", "jobs", "careers", "hr", "security", "root", "enquiries", "inquiries", "newsletter", "privacy",
+  "legal", "feedback", "accounts", "orders"
+]);
+
+const QUOTED = /^"(?:[\x20\x21\x23-\x5B\x5D-\x7E]|\\[\x20-\x7E])*"$/;
+const ATEXT_OR_DOT = /[A-Za-z0-9!#$%&'*+/=?^_`{|}~.-]/;
+const SAFE_LOCAL = /[A-Za-z0-9._+'-]/;
+const utf8Len = (s) => new TextEncoder().encode(s).length;
+
+// Optimal string alignment distance (Levenshtein plus adjacent swaps).
+function osa(a, b) {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...new Array(b.length).fill(0)]);
+  for (let j = 0; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const c = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + c);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+function suggestDomain(domain) {
+  if (PROVIDERS[domain] || DISPOSABLE.has(domain)) return null;
+  const tld = domain.split(".").pop();
+  let best = null, bestD = Infinity;
+  for (const known of Object.keys(PROVIDERS)) {
+    const dist = osa(domain, known);
+    if (dist < bestD) { bestD = dist; best = known; }
+  }
+  // Distance 2 only within the same TLD, so real country variants (hotmail.fr) aren't "corrected".
+  if (best && ((bestD === 1 && domain.length >= 6) || (bestD === 2 && domain.length >= 9 && best.split(".").pop() === tld))) return best;
+  if (TLD_TYPOS[tld]) return domain.slice(0, -tld.length) + TLD_TYPOS[tld];
+  return null;
+}
+
+function isIPv4(s) {
+  const p = s.split(".");
+  return p.length === 4 && p.every((x) => /^\d{1,3}$/.test(x) && +x <= 255);
+}
+
+// ---- Analysis -------------------------------------------------------------
+// Each check: { label, status: pass|warn|fail|info, detail }.
+function analyze(raw) {
+  const checks = [];
+  const r = { raw, address: "", local: "", domain: "", ascii: null, checks, suggestion: null, localS: "pass", domainS: "pass" };
+  const add = (label, status, detail) => checks.push({ label, status, detail });
+  let s = raw.trim();
+  if (!s) { add("Format", "fail", "Enter an email address."); r.localS = r.domainS = "fail"; return r; }
+
+  const named = s.match(/^(.*?)\s*<([^<>]*)>$/);
+  if (named) {
+    s = named[2].trim();
+    add("Display name", "info", named[1] ? `Checked the address inside the angle brackets and ignored the name ${named[1].replace(/^"|"$/g, "")}.` : "Checked the address inside the angle brackets.");
+  }
+  if (/^mailto:/i.test(s)) { s = s.slice(7); add("Link prefix", "info", "Ignored the mailto: prefix."); }
+  r.address = s;
+
+  const at = s.lastIndexOf("@");
+  if (at < 0) {
+    r.local = s; r.localS = r.domainS = "fail";
+    add("Format", "fail", "There is no @ sign. An address looks like name@example.com.");
+    return r;
+  }
+  const local = s.slice(0, at), domain = s.slice(at + 1);
+  r.local = local; r.domain = domain;
+
+  // Name part (before the @)
+  const lf = [], lw = [];
+  if (!local) lf.push("Nothing comes before the @.");
+  else if (local.length >= 2 && local.startsWith('"') && local.endsWith('"')) {
+    if (QUOTED.test(local)) lw.push("A quoted name part is allowed by the standard, but many sign-up forms and mail systems reject it.");
+    else lf.push("The quoted part contains an unescaped quote or backslash.");
+  } else {
+    if (local.includes("@")) lf.push("Has more than one @ sign. Only one is allowed unless the name part is in quotes.");
+    if (/\s/.test(local)) lf.push("Contains a space.");
+    if (local.startsWith(".")) lf.push("Starts with a period.");
+    if (local.endsWith(".")) lf.push("Ends with a period right before the @.");
+    if (local.includes("..")) lf.push("Has two periods in a row.");
+    const ascii = [...local].filter((c) => c.charCodeAt(0) < 128 && c !== "@" && !/\s/.test(c));
+    const bad = [...new Set(ascii.filter((c) => !ATEXT_OR_DOT.test(c)))];
+    if (bad.length) lf.push(`Contains ${bad.join(" ")}, which ${bad.length > 1 ? "are" : "is"} only allowed inside quotes.`);
+    const odd = [...new Set(ascii.filter((c) => ATEXT_OR_DOT.test(c) && !SAFE_LOCAL.test(c)))];
+    if (odd.length) lw.push(`Uses ${odd.join(" ")}. The standard allows ${odd.length > 1 ? "these" : "this"}, but many sign-up forms don't.`);
+    if (/[^\x00-\x7F]/.test(local)) lw.push("Contains non-ASCII letters. Only mail servers with international email (SMTPUTF8) support accept them.");
+  }
+  const localLen = utf8Len(local);
+  if (localLen > 64) lf.push(`The name part is ${localLen} bytes long; the limit is 64.`);
+  r.localS = lf.length ? "fail" : lw.length ? "warn" : "pass";
+  add("Name part", r.localS, [...lf, ...lw].join(" ") || `Valid characters, ${localLen} of 64 bytes.`);
+
+  // Domain (after the @)
+  const df = [], dw = [], di = [];
+  const literal = domain.match(/^\[(.*)\]$/);
+  if (!domain) df.push("Nothing comes after the @.");
+  else if (literal) {
+    if (isIPv4(literal[1]) || /^IPv6:[0-9a-f:.]+$/i.test(literal[1])) dw.push("Uses an IP address instead of a domain name. The standard allows it, but almost no service accepts it.");
+    else df.push("The bracketed part is not a valid IP address.");
+  } else {
+    const badChars = [...new Set(domain.match(/[\s,;:/\\?#@<>()[\]"'!$%&*+=^`{|}~_]/g) || [])];
+    if (badChars.length) df.push(`Contains ${badChars.map((c) => (c === " " ? "a space" : c)).join(" ")}, which can't appear in a domain name.`);
+    else {
+      let ascii = null;
+      try { ascii = new URL(`http://${domain}/`).hostname; } catch { df.push("Is not a valid domain name."); }
+      if (ascii !== null) {
+        if (/[^\x00-\x7F]/.test(domain)) di.push(`International domain; mail systems see it as ${ascii}.`);
+        const labels = ascii.split(".");
+        if (domain.endsWith(".")) df.push("Ends with a period.");
+        else if (labels.length < 2) df.push("Needs a dot and an ending such as .com or .org.");
+        else {
+          labels.forEach((l) => {
+            if (!l) df.push("Has two periods in a row or starts with a period.");
+            else if (l.length > 63) df.push(`The part ${l.slice(0, 12)}… is ${l.length} characters; each part between dots is limited to 63.`);
+            else if (!/^[a-z0-9-]+$/.test(l)) df.push(`The part ${l} contains characters that aren't allowed.`);
+            else if (l.startsWith("-") || l.endsWith("-")) df.push(`The part ${l} starts or ends with a hyphen.`);
+          });
+          const tld = labels[labels.length - 1];
+          if (tld && !df.length && !/^(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})$/.test(tld)) df.push(`.${tld} is not a valid ending; it needs at least two letters.`);
+        }
+        if (ascii.length > 253) df.push(`The domain is ${ascii.length} characters; the limit is 253.`);
+        if (!df.length) r.ascii = ascii;
+      }
+    }
+  }
+  r.domainS = df.length ? "fail" : dw.length ? "warn" : "pass";
+  add("Domain", r.domainS, [...df, ...dw, ...di].join(" ") || "Well-formed domain name.");
+
+  const total = localLen + 1 + utf8Len(domain);
+  if (total > 254) add("Length", "fail", `${total} characters; addresses are limited to 254.`);
+
+  if (r.ascii) {
+    const d = r.ascii;
+    const base = local.toLowerCase().replace(/^"|"$/g, "");
+    const tagless = base.split("+")[0];
+
+    const sug = suggestDomain(d);
+    if (sug) { r.suggestion = `${local}@${sug}`; add("Typo check", "warn", `${d} looks like a misspelling of ${sug}.`); }
+    else add("Typo check", "pass", "No common domain misspelling found.");
+
+    const throwaway = [...DISPOSABLE].find((x) => d === x || d.endsWith("." + x));
+    if (throwaway) add("Throwaway inbox", "warn", `${throwaway} hands out temporary inboxes that expire within hours or days.`);
+
+    if (d === "gmail.com" || d === "googlemail.com") {
+      const user = tagless.replace(/\./g, "");
+      if (!/^[a-z0-9]+$/.test(user) || user.length < 6 || user.length > 30) add("Gmail rules", "warn", "Gmail usernames are 6 to 30 letters, numbers and periods, so this address almost certainly doesn't exist.");
+      else if (tagless.includes(".")) add("Gmail rules", "info", `Gmail ignores periods, so this reaches the same inbox as ${user}@gmail.com.`);
+    }
+    if (base.includes("+") && tagless) add("Plus tag", "info", `Uses a +tag. Most providers deliver it to ${tagless}@${d}.`);
+    if (ROLES.has(tagless)) add("Role address", "info", "Usually a shared team inbox rather than one person.");
+    if (PROVIDERS[d]) add("Provider", "info", `Free personal mailbox from ${PROVIDERS[d]}.`);
+  }
+  return r;
+}
+
+function verdictOf(r, dns) {
+  const all = dns ? [...r.checks, dns] : r.checks;
+  if (all.some((c) => c.status === "fail")) return "invalid";
+  if (all.some((c) => c.status === "warn")) return "risky";
+  return "valid";
+}
+
+// ---- Mail server lookup (DNS over HTTPS) ----------------------------------
+const dnsCache = new Map();
+function lookupMail(domain) {
+  if (dnsCache.has(domain)) return dnsCache.get(domain);
+  const query = async (type) => {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 6000);
+    try {
+      const res = await fetch(`https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
+        { headers: { accept: "application/dns-json" }, signal: ctl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally { clearTimeout(timer); }
+  };
+  const p = (async () => {
+    const mx = await query("MX");
+    if (mx.Status === 3) return { status: "fail", detail: `${domain} does not exist in DNS.` };
+    const hosts = (mx.Answer || []).filter((a) => a.type === 15).map((a) => {
+      const [pref, host = ""] = a.data.trim().split(/\s+/);
+      return { pref: +pref, host: host.replace(/\.$/, "") };
+    }).sort((a, b) => a.pref - b.pref);
+    if (hosts.length === 1 && !hosts[0].host) return { status: "fail", detail: `${domain} publishes a "null MX" record, which says it accepts no email.` };
+    if (hosts.length) {
+      const names = hosts.slice(0, 3).map((h) => h.host).join(", ");
+      return { status: "pass", detail: `Accepts mail via ${names}${hosts.length > 3 ? ` and ${hosts.length - 3} more` : ""}.` };
+    }
+    const a = await query("A");
+    if ((a.Answer || []).some((x) => x.type === 1)) return { status: "warn", detail: "No mail server (MX) record. Senders fall back to the domain's web address, which often doesn't accept mail." };
+    return { status: "fail", detail: `${domain} has no mail server or address records.` };
+  })().catch(() => ({ status: "skip", detail: "Couldn't reach DNS from this page. Open the file directly in a browser to run this check." }));
+  dnsCache.set(domain, p);
+  return p;
+}
+</script>
+
+<script>
+const $ = (id) => document.getElementById(id);
+function el(tag, attrs = {}, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k.startsWith("data-")) n.setAttribute(k, v); else n[k] = v;
+  }
+  for (const k of kids) if (k != null) n.append(k);
+  return n;
+}
+const GLYPH = { pass: "✓", warn: "!", fail: "✕", info: "i", pending: "", skip: "" };
+const LABEL = { valid: "Valid", risky: "Risky", invalid: "Invalid" };
+
+// ---- Single address -------------------------------------------------------
+const SAMPLES = ["sam.rivera@gmial.com", "first..last@example.com", "test@mailinator.com", "\"jo smith\"@example.org", "ana@bücher.de", "orders@anthropic.com"];
+SAMPLES.forEach((s) => $("samples").append(el("button", { class: "chip", type: "button", textContent: s, onclick: () => { $("addr").value = s; runSingle(); } })));
+
+let singleSeq = 0;
+function runSingle() {
+  const r = analyze($("addr").value);
+  const seq = ++singleSeq;
+  const dnsRow = { label: "Mail servers", status: "skip", detail: "Runs once the domain is valid." };
+  if (r.ascii) { dnsRow.status = "pending"; dnsRow.detail = "Looking up the domain's mail servers…"; }
+  renderSingle(r, r.ascii ? null : dnsRow, dnsRow);
+  if (r.ascii) {
+    lookupMail(r.ascii).then((res) => {
+      if (seq !== singleSeq) return;
+      const row = { label: "Mail servers", ...res };
+      renderSingle(r, res.status === "skip" ? null : row, row);
+    });
+  }
+}
+
+function renderSingle(r, dnsForVerdict, dnsRow) {
+  const name = r.local || (r.address && !r.address.includes("@") ? r.address : "");
+  $("anatomy").replaceChildren(
+    el("div", { class: "seg", "data-s": r.localS }, el("span", { class: "txt", textContent: name || " " }), el("span", { class: "cap", textContent: `name · ${utf8Len(r.local)}/64` })),
+    el("div", { class: "seg at" }, el("span", { class: "txt", textContent: "@" }), el("span", { class: "cap", textContent: " " })),
+    el("div", { class: "seg", "data-s": r.domainS }, el("span", { class: "txt", textContent: r.domain || " " }), el("span", { class: "cap", textContent: `domain${r.ascii && r.ascii !== r.domain.toLowerCase() ? ` · ${r.ascii}` : ""}` }))
+  );
+
+  const v = verdictOf(r, dnsForVerdict);
+  const all = [...r.checks, dnsRow];
+  const first = all.find((c) => c.status === "fail") || all.find((c) => c.status === "warn");
+  const summary = first ? first.detail
+    : dnsRow.status === "pass" ? "Correct format, and the domain accepts mail."
+    : "Correct format. Mail server check pending or unavailable.";
+  $("verdict").replaceChildren(el("span", { class: "pill", "data-v": v, textContent: LABEL[v] }), el("span", { class: "verdict-text", textContent: summary }));
+
+  const sug = $("suggest");
+  sug.hidden = !r.suggestion;
+  if (r.suggestion) {
+    sug.replaceChildren(
+      el("span", {}, "Did you mean ", el("span", { class: "mono", textContent: r.suggestion }), "?"),
+      el("button", { class: "btn", type: "button", textContent: "Use this", onclick: () => { $("addr").value = r.suggestion; runSingle(); $("addr").focus(); } })
+    );
+  }
+
+  const order = (c) => (c.label === "Mail servers" ? 3 : c.status === "info" ? 4 : c.label === "Name part" ? 0 : c.label === "Domain" ? 1 : 2);
+  const rows = all.slice().sort((a, b) => order(a) - order(b));
+  $("checks").replaceChildren(...rows.map((c) => el("li", {},
+    el("span", { class: "mark", "data-s": c.status, textContent: GLYPH[c.status], "aria-label": c.status }),
+    el("span", { class: "name", textContent: c.label }),
+    el("span", { class: "detail", textContent: c.detail })
+  )));
+}
+
+let singleTimer;
+$("addr").addEventListener("input", () => { clearTimeout(singleTimer); singleTimer = setTimeout(runSingle, 250); });
+
+// ---- Bulk -----------------------------------------------------------------
+const SAMPLE_LIST = [
+  "jane.doe@gmail.com", "sam@gmial.com", "Priya Shah <priya@outlook.com>", "first..last@example.com",
+  "test@mailinator.com", "lee+news@outlook.com", "no-at-sign.example.com", "ana@bücher.de",
+  "bob@example.con", "jane.doe@gmail.com", "support@github.com", "x@localhost"
+].join("\n");
+$("list").value = SAMPLE_LIST;
+let bulkResults = [];
+let bulkSeq = 0;
+
+function splitList(text) {
+  return text.split(/[\n;]+|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((s) => s.trim()).filter(Boolean);
+}
+
+function runBulk() {
+  const seq = ++bulkSeq;
+  const useDns = $("dnsToggle").checked;
+  const seen = new Set();
+  bulkResults = splitList($("list").value).map((line) => {
+    const r = analyze(line);
+    const key = r.address.toLowerCase();
+    if (seen.has(key)) r.checks.push({ label: "Duplicate", status: "warn", detail: "Appears earlier in the list." });
+    seen.add(key);
+    return { r, dns: null };
+  });
+  renderBulk();
+  if (!useDns) return;
+  bulkResults.forEach((item) => {
+    if (!item.r.ascii) return;
+    lookupMail(item.r.ascii).then((res) => {
+      if (seq !== bulkSeq) return;
+      item.dns = { label: "Mail servers", ...res };
+      scheduleBulkRender();
+    });
+  });
+}
+let raf = 0;
+function scheduleBulkRender() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderBulk(); }); }
+
+function bulkVerdict(item) { return verdictOf(item.r, item.dns && item.dns.status !== "skip" ? item.dns : null); }
+function bulkReason(item) {
+  const all = item.dns ? [...item.r.checks, item.dns] : item.r.checks;
+  const first = all.find((c) => c.status === "fail") || all.find((c) => c.status === "warn");
+  let text = first ? first.detail : item.dns && item.dns.status === "pass" ? item.dns.detail : "Correct format.";
+  if (item.r.suggestion) text += ` Did you mean ${item.r.suggestion}?`;
+  return text;
+}
+
+function renderBulk() {
+  const tally = { valid: 0, risky: 0, invalid: 0 };
+  const rows = bulkResults.map((item, i) => {
+    const v = bulkVerdict(item);
+    tally[v]++;
+    return el("tr", {},
+      el("td", { class: "n", textContent: i + 1 }),
+      el("td", { class: "a", textContent: item.r.address || item.r.raw }),
+      el("td", {}, el("span", { class: "pill", "data-v": v, textContent: LABEL[v] })),
+      el("td", { class: "why", textContent: bulkReason(item) })
+    );
+  });
+  const n = bulkResults.length || 1;
+  const pct = (k) => `${(tally[k] / n) * 100}%`;
+  $("tally").replaceChildren(
+    el("div", { class: "bar", role: "img", "aria-label": `${tally.valid} valid, ${tally.risky} risky, ${tally.invalid} invalid` },
+      el("span", { class: "v", style: `width:${pct("valid")}` }), el("span", { class: "r", style: `width:${pct("risky")}` }), el("span", { class: "i", style: `width:${pct("invalid")}` })),
+    el("div", { class: "counts" },
+      el("span", {}, el("span", { class: "dot", style: "background:var(--ok)" }), el("b", { textContent: tally.valid }), " valid"),
+      el("span", {}, el("span", { class: "dot", style: "background:var(--warn)" }), el("b", { textContent: tally.risky }), " risky"),
+      el("span", {}, el("span", { class: "dot", style: "background:var(--bad)" }), el("b", { textContent: tally.invalid }), " invalid"),
+      el("span", { class: "hint", textContent: `${bulkResults.length} total` }))
+  );
+  $("rows").replaceChildren(...(rows.length ? rows : [el("tr", {}, el("td", { colSpan: 4, class: "why", textContent: "Paste addresses above to check them." }))]));
+}
+
+let bulkTimer;
+$("list").addEventListener("input", () => {
+  $("bulkHint").textContent = "Results update as you type.";
+  clearTimeout(bulkTimer); bulkTimer = setTimeout(runBulk, 350);
+});
+$("dnsToggle").addEventListener("change", runBulk);
+
+async function copyText(text, okMsg) {
+  const fb = $("copyFallback");
+  try {
+    await navigator.clipboard.writeText(text);
+    fb.hidden = true;
+    $("copyMsg").textContent = okMsg;
+  } catch {
+    fb.value = text; fb.hidden = false; fb.focus(); fb.select();
+    $("copyMsg").textContent = "Copying is blocked here. The text is selected below; press Ctrl+C or ⌘C.";
+  }
+}
+$("copyValid").addEventListener("click", () => {
+  const list = bulkResults.filter((x) => bulkVerdict(x) === "valid").map((x) => x.r.address);
+  copyText(list.join("\n"), `Copied ${list.length} valid address${list.length === 1 ? "" : "es"}.`);
+});
+$("copyCsv").addEventListener("click", () => {
+  const q = (s) => `"${String(s).replace(/"/g, '""')}"`;
+  const lines = [["address", "result", "reason", "suggestion"].join(",")].concat(
+    bulkResults.map((x) => [x.r.address || x.r.raw, LABEL[bulkVerdict(x)], bulkReason(x), x.r.suggestion || ""].map(q).join(",")));
+  copyText(lines.join("\n"), `Copied ${bulkResults.length} rows as CSV.`);
+});
+
+// ---- Tabs -----------------------------------------------------------------
+function showTab(which) {
+  ["single", "bulk"].forEach((t) => {
+    $(`tab-${t}`).setAttribute("aria-selected", String(t === which));
+    $(`panel-${t}`).hidden = t !== which;
+  });
+  try { localStorage.setItem("email-checker-tab", which); } catch {}
+}
+$("tab-single").addEventListener("click", () => showTab("single"));
+$("tab-bulk").addEventListener("click", () => showTab("bulk"));
+try { const t = localStorage.getItem("email-checker-tab"); if (t === "bulk") showTab("bulk"); } catch {}
+
+runSingle();
+runBulk();
+</script>
